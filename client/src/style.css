@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+/* Reset de impresión compartido por los modales de reporte (ReporteBalanceModal,
+   ReporteLibroComprasModal, ReportePolizaModal). Va sin scope a propósito: las
+   reglas de scoped-CSS de Vue no pueden alcanzar elementos fuera del componente.
+
+   Cada uno de esos modales se monta con <Teleport to="body">, así que al imprimir
+   basta con ocultar #app (que colapsa a altura 0) en vez de intentar volver
+   invisible el resto del documento con visibility:hidden, que no libera el
+   espacio que ocupa en el flujo y dejaba hojas en blanco extra. */
+@media print {
+  #app {
+    display: none !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .fixed {
+    position: static !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+
+  .print-wrapper {
+    padding: 0 !important;
+    background: white !important;
+    overflow: visible !important;
+  }
+
+  .printable-area {
+    box-shadow: none !important;
+    padding: 0 !important;
+    width: 100% !important;
+    min-height: auto !important;
+    /* La vista previa en pantalla le da un max-height + scroll propio (para no
+       depender del alto fijo del modal); al imprimir de verdad el documento
+       tiene que fluir completo por todas las páginas que necesite. */
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .bg-slate-900 {
+    background-color: white !important;
+    border: none !important;
+    box-shadow: none !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+}

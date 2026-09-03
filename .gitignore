@@ -1,0 +1,27 @@
+# Dependencias
+node_modules/
+
+# Bases de datos reales (datos de clientes/proveedores/sueldos -- nunca a git)
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# Exports/backups con datos reales
+server/backup_pre_reimport_*/
+sql/datos_*.sql
+sql/*.rar
+
+# Config local / secretos (nombres de empresas reales, RUTs, reglas
+# específicas -- ver los *.example.js junto a cada uno para el formato)
+.env
+.env.local
+server/empresas.js
+server/config.local.js
+
+# Accesos directos generados localmente (llevan la ruta absoluta de cada
+# máquina grabada adentro -- se regeneran con "Crear Acceso Directo.bat")
+*.lnk
+
+# Editor / OS
+.DS_Store
+Thumbs.db
