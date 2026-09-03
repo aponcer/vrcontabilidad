@@ -1799,13 +1799,22 @@ app.post('/api/cdiario/carga-movimientos', (req, res) => {
     const errores = [];
     const resueltas = rows.map((r, i) => {
       const numFila = i + 2; // +1 por el encabezado, +1 por índice 0-based
+      const cuentaTexto = (r.cuentaNombre || '').trim();
 
-      const cuentaRow = req.db.prepare(`
-        SELECT Codigo FROM Cuenta WHERE UPPER(TRIM(Nombre)) = UPPER(TRIM(?))
-      `).get(r.cuentaNombre);
+      // La columna "Cuenta" del CSV puede traer el nombre o directamente el
+      // código (a veces sin ceros a la izquierda, ej. "110" en vez de "0110",
+      // típico cuando la celda quedó formateada como número en la planilla).
+      let cuentaRow = null;
+      if (/^\d+$/.test(cuentaTexto)) {
+        cuentaRow = req.db.prepare(`SELECT Codigo FROM Cuenta WHERE Codigo = ?`).get(cuentaTexto.padStart(4, '0'))
+          || req.db.prepare(`SELECT Codigo FROM Cuenta WHERE Codigo = ?`).get(cuentaTexto);
+      }
+      if (!cuentaRow) {
+        cuentaRow = req.db.prepare(`SELECT Codigo FROM Cuenta WHERE UPPER(TRIM(Nombre)) = UPPER(TRIM(?))`).get(cuentaTexto);
+      }
 
       if (!cuentaRow) {
-        errores.push(`Fila ${numFila}: no se encontró la Cuenta "${r.cuentaNombre}" en el Plan de Cuentas.`);
+        errores.push(`Fila ${numFila}: no se encontró la Cuenta "${cuentaTexto}" en el Plan de Cuentas.`);
         return null;
       }
 
