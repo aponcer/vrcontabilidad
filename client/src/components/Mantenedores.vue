@@ -196,20 +196,10 @@ const DOCUMENTO_A_TDOC = {
   CHEQUE: 'CH'
 }
 
-// Estos archivos (exportados desde Excel en Windows) vienen codificados en
-// Windows-1252 (ANSI), no UTF-8 -- leerlos con file.text() (que asume UTF-8)
-// pierde sin remedio cualquier tilde o "°"/"º" como el caracter de reemplazo
-// "�", porque esos bytes no forman una secuencia UTF-8 válida. Se leen los
-// bytes crudos y se decodifican con la codificación correcta desde el
-// principio, sacando antes el BOM UTF-8 si vino al inicio del archivo.
-const leerArchivoComoTexto = async (file) => {
-  const buffer = await file.arrayBuffer()
-  let bytes = new Uint8Array(buffer)
-  if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
-    bytes = bytes.subarray(3)
-  }
-  return new TextDecoder('windows-1252').decode(bytes)
-}
+// Estos archivos ya vienen en UTF-8 -- file.text() los decodifica bien tal
+// cual (incluyendo sacar el BOM automáticamente si vino al inicio). No hace
+// falta ningún truco de codificación extra acá.
+const leerArchivoComoTexto = (file) => file.text()
 
 // Los montos vienen sin separador decimal, solo "." como separador de miles
 // (ej. "2.679.347"), así que basta con quitar los puntos.
