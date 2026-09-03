@@ -196,16 +196,19 @@ const DOCUMENTO_A_TDOC = {
   CHEQUE: 'CH'
 }
 
-// Estos archivos vienen con mojibake (UTF-8 re-leído como Latin-1, ej. "Ã³"
-// en vez de "ó", "Â°" en vez de "°", BOM como "ï»¿"). Se revierte tomando
-// cada char code como un byte Latin-1 y re-decodificando como UTF-8.
-const arreglarMojibake = (texto) => {
-  try {
-    const bytes = Uint8Array.from([...texto].map((c) => c.charCodeAt(0) & 0xff))
-    return new TextDecoder('utf-8').decode(bytes)
-  } catch {
-    return texto
+// Estos archivos (exportados desde Excel en Windows) vienen codificados en
+// Windows-1252 (ANSI), no UTF-8 -- leerlos con file.text() (que asume UTF-8)
+// pierde sin remedio cualquier tilde o "°"/"º" como el caracter de reemplazo
+// "�", porque esos bytes no forman una secuencia UTF-8 válida. Se leen los
+// bytes crudos y se decodifican con la codificación correcta desde el
+// principio, sacando antes el BOM UTF-8 si vino al inicio del archivo.
+const leerArchivoComoTexto = async (file) => {
+  const buffer = await file.arrayBuffer()
+  let bytes = new Uint8Array(buffer)
+  if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
+    bytes = bytes.subarray(3)
   }
+  return new TextDecoder('windows-1252').decode(bytes)
 }
 
 // Los montos vienen sin separador decimal, solo "." como separador de miles
@@ -227,9 +230,7 @@ const CARGA_MOVCAJA_ALIASES = {
 // decodificados terminan todas comparando como "ndocumento".
 const normalizarEncabezado = (str) => (str || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
 
-const parseCsvMovCaja = (textoCrudo) => {
-  const BOM = String.fromCharCode(0xfeff)
-  const texto = arreglarMojibake(textoCrudo).split(BOM).join('')
+const parseCsvMovCaja = (texto) => {
   const lineas = texto.split(/\r?\n/).filter((l) => l.trim().length > 0)
   if (lineas.length < 2) return []
 
@@ -488,7 +489,7 @@ const handleProcesarSii = async () => {
   // (no por la red), así que queda fuera de la barra de progreso.
   let rows
   try {
-    const texto = await archivoSeleccionado.value.text()
+    const texto = await leerArchivoComoTexto(archivoSeleccionado.value)
     rows = parseCsvSii(texto, cargaSiiForm.value.tipo)
   } catch (err) {
     alert('Error al leer el archivo: ' + err.message)
@@ -585,7 +586,7 @@ const handleCargarMovCaja = async () => {
 
   let rows
   try {
-    const texto = await movCajaArchivo.value.text()
+    const texto = await leerArchivoComoTexto(movCajaArchivo.value)
     rows = parseCsvMovCaja(texto)
   } catch (err) {
     alert('Error al leer el archivo: ' + err.message)
