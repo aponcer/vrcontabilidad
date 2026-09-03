@@ -123,8 +123,8 @@ const handleImprimir = () => {
                 <td colspan="6" class="py-1 font-sans">
                   {{ utilPerdidaGanancia < 0 ? 'Perdida del Ejercicio' : 'Utilidad del Ejercicio' }}
                 </td>
-                <td class="py-1 text-right">{{ utilActivoPasivo > 0 ? fmt(utilActivoPasivo) : '0' }}</td>
                 <td class="py-1 text-right">{{ utilActivoPasivo < 0 ? fmt(Math.abs(utilActivoPasivo)) : '0' }}</td>
+                <td class="py-1 text-right">{{ utilActivoPasivo > 0 ? fmt(utilActivoPasivo) : '0' }}</td>
                 <td class="py-1 text-right">{{ utilPerdidaGanancia > 0 ? fmt(utilPerdidaGanancia) : '0' }}</td>
                 <td class="py-1 text-right">{{ utilPerdidaGanancia < 0 ? fmt(Math.abs(utilPerdidaGanancia)) : '0' }}</td>
               </tr>
