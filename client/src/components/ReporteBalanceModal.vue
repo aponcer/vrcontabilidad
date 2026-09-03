@@ -58,9 +58,11 @@ const handleImprimir = () => {
       <div class="p-8 bg-slate-950 flex justify-center print-wrapper overflow-y-auto">
         <div class="printable-area shrink-0 overflow-y-auto max-h-[65vh] bg-white text-black p-8 shadow-2xl w-[280mm] font-sans text-[10px]">
           
-          <!-- Header Oficial con Título Centrado -->
-          <div class="grid grid-cols-12 items-start mb-6">
-            <div class="col-span-5 space-y-0.5 font-bold uppercase text-[10px]">
+          <!-- Header Oficial: datos de la empresa flotan arriba a la izquierda,
+               sin afectar el centrado del título (que va centrado en todo el
+               ancho de la hoja, no solo en el espacio que sobra a la derecha). -->
+          <div class="relative mb-6 min-h-16">
+            <div class="absolute left-0 top-0 space-y-0.5 font-bold uppercase text-[10px]">
               <p class="text-xs">{{ empresa.Rsoc || 'EMPRESA' }}</p>
               <p>RUT: {{ empresa.Rut || '' }}</p>
               <p>{{ empresa.Direccion || '' }}</p>
@@ -68,7 +70,7 @@ const handleImprimir = () => {
               <p v-if="empresa.RutRepLegal">RUT: {{ empresa.RutRepLegal }}</p>
             </div>
 
-            <div class="col-span-7 text-center pr-12">
+            <div class="text-center">
               <h1 class="text-base font-bold uppercase tracking-tight">Balance General</h1>
               <p class="text-xs font-semibold mt-1">Período: <strong>{{ periodo }}</strong></p>
             </div>
