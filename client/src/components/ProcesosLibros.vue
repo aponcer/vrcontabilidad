@@ -66,7 +66,7 @@ const handleProcesar = async () => {
         desde: mayorForm.value.desde,
         hasta: mayorForm.value.hasta,
         cuenta: mayorForm.value.cuenta
-      }), 'Procesando Libro Mayor...')
+      }), 'Consultando Libro Mayor...')
       mayorProcesado.value = { desde: mayorForm.value.desde, hasta: mayorForm.value.hasta }
       estadoMensaje.value = res.data.message
 
@@ -74,7 +74,7 @@ const handleProcesar = async () => {
       const res = await run(() => axios.post('http://localhost:3000/api/ldiario/procesar', {
         desde: diarioForm.value.desde,
         hasta: diarioForm.value.hasta
-      }), 'Procesando Libro Diario...')
+      }), 'Consultando Libro Diario...')
       diarioProcesado.value = { desde: diarioForm.value.desde, hasta: diarioForm.value.hasta }
       estadoMensaje.value = res.data.message
     }
@@ -185,7 +185,7 @@ const handleImprimir = async () => {
           @click="handleProcesar"
           :disabled="cargando"
           class="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-slate-950 font-bold py-2.5 px-4 rounded text-sm transition-colors cursor-pointer italic shadow">
-          Procesar
+          Consultar
         </button>
         <button
           @click="handleImprimir"

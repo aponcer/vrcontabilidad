@@ -1337,6 +1337,8 @@ app.post('/api/rcv/procesar-sii', (req, res) => {
         req.db.exec(req.queries.clearLcompra);
         const stmt = req.db.prepare(req.queries.saveCompra);
 
+        const buscarCuentaProvee = req.db.prepare(`SELECT Cuenta FROM Provee WHERE Rut = ?`);
+
         rows.forEach(r => {
           const isFA = r.Tdoc === '33';
           const tdoc = isFA ? 'FA' : 'NC';
@@ -1350,7 +1352,14 @@ app.post('/api/rcv/procesar-sii', (req, res) => {
           const total = r.Total * factor;
           const glosa = `${tdoc} ${r.Numdoc}`;
 
-          stmt.run(r.Rut, tdoc, r.Numdoc, r.Fecha, neto, exen, iva, total, glosa, '', periodo);
+          // La Cuenta de gasto es la que tiene asignada el proveedor
+          // (Provee.Cuenta), igual que Procesar_Click en RegComp.frm -- si el
+          // proveedor no está registrado, queda vacía (Contabilización cae al
+          // 0304 por defecto en ese caso).
+          const provee = buscarCuentaProvee.get(r.Rut);
+          const cuenta = provee ? (provee.Cuenta || '').trim() : '';
+
+          stmt.run(r.Rut, tdoc, r.Numdoc, r.Fecha, neto, exen, iva, total, glosa, cuenta, periodo);
         });
       });
 
