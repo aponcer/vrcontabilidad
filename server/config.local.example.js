@@ -7,5 +7,9 @@ module.exports = {
   // .frm original de Liquidación de Sueldos): en vez del Ces_trab/Ces_emp de
   // la tabla Indi, a ese trabajador se le calcula únicamente un 0.8% de
   // aporte empresa y 0% de aporte trabajador. Dejar vacío si no aplica.
-  rutExcepcionCesantia: ''
+  rutExcepcionCesantia: '',
+  // RUT de un trabajador (heredado del Liq_suel.frm propio de Ferroq) al que
+  // no se le calcula descuento de Afp ni de Isapre (dueño/socio, no un
+  // trabajador con cotizaciones regulares). Dejar vacío si no aplica.
+  rutExcepcionAfpIsapre: ''
 }

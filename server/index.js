@@ -359,6 +359,10 @@ try {
   configLocal = require('./config.local.example.js');
 }
 const RUT_EXCEPCION_CESANTIA = configLocal.rutExcepcionCesantia || '';
+// Mismo mecanismo, para la regla de Ferroq (Liq_suel.frm de esa empresa): a
+// este Rut se le calcula Afp e Isapre en 0 en vez del descuento normal (es el
+// dueño/socio, no un trabajador con cotizaciones regulares).
+const RUT_EXCEPCION_AFP_ISAPRE = configLocal.rutExcepcionAfpIsapre || '';
 
 // 1. Calcular los haberes/descuentos base de una liquidación (dispara al perder foco
 // "Dias Trabajados" en el .frm original -> Text2_LostFocus).
@@ -442,10 +446,17 @@ app.get('/api/liq-suel/base', (req, res) => {
     const saludValor = tipoIsapre === 'UF' ? p.valorIsapre : isapreRow.Cotiza;
     const saludUnidad = tipoIsapre === 'UF' ? 'UF' : '%';
 
-    const afpDescuento = redondear(totalImponible * afpRow.Cotiza / 100);
+    let afpDescuento = redondear(totalImponible * afpRow.Cotiza / 100);
     // El descuento legal de Salud siempre usa el % del maestro Isapre (7% base),
     // incluso si el plan está pactado en UF -- la diferencia se calcula aparte.
-    const saludDescuento = redondear(totalImponible * isapreRow.Cotiza / 100);
+    let saludDescuento = redondear(totalImponible * isapreRow.Cotiza / 100);
+    // Excepción de Ferroq (ver RUT_EXCEPCION_AFP_ISAPRE): sin cotizaciones de
+    // Afp ni Isapre. Va antes del cálculo de diferenciaIsapre a propósito --
+    // el .frm original también la calcula sobre el saludDescuento ya en 0.
+    if (rut === RUT_EXCEPCION_AFP_ISAPRE) {
+      afpDescuento = 0;
+      saludDescuento = 0;
+    }
 
     let diferenciaIsapre = 0;
     if (tipoIsapre === 'UF') {
@@ -595,10 +606,10 @@ app.post('/api/liq-suel/contabilizar', (req, res) => {
           const aportesTrabajador = (r.afpDescuento || 0) + (r.saludDescuento || 0) + (r.diferenciaIsapre || 0) + (r.cesTrabajador || 0);
           insertLinea('0211', 'C', aportesTrabajador, 'Aportes trabajador');
         }
-        if (r.sis > 0) insertLinea('0211', 'C', aportesEmpresa, 'Aportes empresa');
+        if (r.sis > 0 || r.accTrabajo > 0 || r.cesEmpresa > 0) insertLinea('0211', 'C', aportesEmpresa, 'Aportes empresa');
         if (r.iut > 0) insertLinea('0212', 'C', r.iut, 'Impuesto Unico');
         if (r.anticipo > 0) insertLinea('0117', 'C', r.anticipo, 'Anticipo');
-        if (r.ctaCte > 0) insertLinea('0117', 'C', r.ctaCte, 'Cuenta Corriente');
+        if (r.ctaCte > 0) insertLinea('0213', 'C', r.ctaCte, 'Cuenta Corriente');
 
         liquidoAcumulado += r.liquido || 0;
       });
