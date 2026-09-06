@@ -76,4 +76,4 @@ El sistema administra múltiples clientes de forma **completamente aislada**, re
 ## 👨‍💻 Créditos
 
 **Sistema Original (Concepción, Lógica Contable y Arquitectura Base):**
-* **Víctor Reyes**, Contador Público.
+* **Víctor Reyes**, Contador Auditor.
