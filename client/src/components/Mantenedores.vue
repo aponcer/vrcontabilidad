@@ -90,13 +90,24 @@ const fechaSiiAIso = (fecha) => {
   return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
 }
 
+// El RCV del SII normalmente viene separado por ";", pero a veces (ej. al
+// reabrir y volver a guardar el archivo en Excel) queda separado por ",".
+// Se detecta mirando cuál aparece más veces en el encabezado, en vez de
+// asumir uno fijo.
+const detectarDelimitadorCsv = (headerLine) => {
+  const puntoYComa = (headerLine.match(/;/g) || []).length
+  const coma = (headerLine.match(/,/g) || []).length
+  return puntoYComa > coma ? ';' : ','
+}
+
 const parseCsvSii = (texto, tipo) => {
   const lineas = texto.split(/\r?\n/).filter(l => l.trim().length > 0)
   if (lineas.length < 2) return []
 
   const esCompras = tipo === 'compras'
+  const delimitador = detectarDelimitadorCsv(lineas[0])
 
-  const headers = lineas[0].split(';').map(h => h.trim())
+  const headers = lineas[0].split(delimitador).map(h => h.trim())
   const buscarIndice = (alias) => {
     for (const nombre of alias) {
       const i = headers.findIndex(h => h.toLowerCase() === nombre.toLowerCase())
@@ -119,7 +130,7 @@ const parseCsvSii = (texto, tipo) => {
   }
 
   return lineas.slice(1).map(linea => {
-    const cols = linea.split(';')
+    const cols = linea.split(delimitador)
 
     const tdocCsv = (cols[idx.Tdoc] || '').trim()
     const iva = Number(cols[idx.Iva]) || 0
@@ -219,14 +230,6 @@ const CARGA_MOVCAJA_ALIASES = {
 // el archivo -- "Nº Documento", "N° Documento" y variantes con caracteres mal
 // decodificados terminan todas comparando como "ndocumento".
 const normalizarEncabezado = (str) => (str || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
-
-// El banco a veces exporta separado por "," y a veces por ";" -- se detecta
-// mirando cuál aparece más veces en el encabezado, en vez de asumir uno fijo.
-const detectarDelimitadorCsv = (headerLine) => {
-  const puntoYComa = (headerLine.match(/;/g) || []).length
-  const coma = (headerLine.match(/,/g) || []).length
-  return puntoYComa > coma ? ';' : ','
-}
 
 const parseCsvMovCaja = (texto) => {
   const lineas = texto.split(/\r?\n/).filter((l) => l.trim().length > 0)
