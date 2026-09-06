@@ -100,6 +100,12 @@ const detectarDelimitadorCsv = (headerLine) => {
   return puntoYComa > coma ? ';' : ','
 }
 
+// Compara encabezados ignorando tildes/símbolos (ej. "º", "°", espacios extra)
+// en vez de intentar adivinar la codificación exacta con la que el navegador
+// decodificó el archivo -- "Nº Documento", "N° Documento" y variantes con
+// caracteres mal decodificados terminan todas comparando como "ndocumento".
+const normalizarEncabezado = (str) => (str || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
+
 const parseCsvSii = (texto, tipo) => {
   const lineas = texto.split(/\r?\n/).filter(l => l.trim().length > 0)
   if (lineas.length < 2) return []
@@ -193,6 +199,64 @@ const parseCsvSii = (texto, tipo) => {
   })
 }
 
+// --- Parseo del CSV "Carga SII Ventas Boletas" (por ahora exclusivo de
+// Ferroq -- el SII entrega las Boletas en un reporte aparte del RCV de Ventas
+// normal, sin desglose por cliente real, así que Tipo Doc/Rut/Razón Social
+// van fijos acá en vez de leerse del archivo) ---
+const RUT_BOLETAS_FERROQ = '55555555-5'
+
+const CARGA_SII_VENTAS_BOLETAS_ALIASES = {
+  Fecha: ['Fecha Docto'],
+  Folio: ['Folio'],
+  Neto: ['Monto Neto'],
+  Iva: ['Monto IVA']
+}
+
+const parseCsvSiiVentasBoletas = (texto) => {
+  const lineas = texto.split(/\r?\n/).filter(l => l.trim().length > 0)
+  if (lineas.length < 2) return []
+
+  const delimitador = detectarDelimitadorCsv(lineas[0])
+  const headers = lineas[0].split(delimitador).map(h => normalizarEncabezado(h))
+  const buscarIndice = (alias) => {
+    for (const nombre of alias) {
+      const i = headers.indexOf(normalizarEncabezado(nombre))
+      if (i !== -1) return i
+    }
+    return -1
+  }
+
+  const idx = Object.fromEntries(
+    Object.entries(CARGA_SII_VENTAS_BOLETAS_ALIASES).map(([campo, alias]) => [campo, buscarIndice(alias)])
+  )
+
+  const faltantes = Object.entries(idx).filter(([, i]) => i === -1).map(([campo]) => campo)
+  if (faltantes.length > 0) {
+    throw new Error(`No se encontraron en el CSV las columnas para: ${faltantes.join(', ')}.`)
+  }
+
+  return lineas.slice(1).map(linea => {
+    const cols = linea.split(delimitador)
+    const neto = Number(cols[idx.Neto]) || 0
+    const iva = Number(cols[idx.Iva]) || 0
+
+    return {
+      Tdoc: '34',
+      Numdoc: (cols[idx.Folio] || '').trim(),
+      Fecha: fechaSiiAIso((cols[idx.Fecha] || '').trim()),
+      Rut: RUT_BOLETAS_FERROQ,
+      Rsoc: 'Boletas',
+      Neto: neto,
+      // El Monto Exento del archivo se ignora a propósito: en Boletas siempre
+      // es 0, y el Total se recalcula como Neto+Iva en vez de confiar en la
+      // columna "Monto Total" del archivo (mismo criterio que Carga Compras).
+      Exen: 0,
+      Iva: iva,
+      Total: neto + iva
+    }
+  })
+}
+
 // --- Parseo del CSV de Movimientos de Caja (Carga Movimientos Caja) ---
 
 // El "Documento" del CSV se traduce al mismo Tdoc que usa el select de
@@ -224,12 +288,6 @@ const CARGA_MOVCAJA_ALIASES = {
   DebHab: ['Debito/Credito', 'Débito/Crédito'],
   Cuenta: ['Cuenta']
 }
-
-// Compara encabezados ignorando tildes/símbolos (ej. "º", "°") en vez de
-// intentar adivinar la codificación exacta con la que el navegador decodificó
-// el archivo -- "Nº Documento", "N° Documento" y variantes con caracteres mal
-// decodificados terminan todas comparando como "ndocumento".
-const normalizarEncabezado = (str) => (str || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
 
 const parseCsvMovCaja = (texto) => {
   const lineas = texto.split(/\r?\n/).filter((l) => l.trim().length > 0)
@@ -492,7 +550,9 @@ const handleProcesarSii = async () => {
   let rows
   try {
     const texto = await leerArchivoComoTexto(archivoSeleccionado.value)
-    rows = parseCsvSii(texto, cargaSiiForm.value.tipo)
+    rows = cargaSiiForm.value.tipo === 'ventas-boletas'
+      ? parseCsvSiiVentasBoletas(texto)
+      : parseCsvSii(texto, cargaSiiForm.value.tipo)
   } catch (err) {
     alert('Error al leer el archivo: ' + err.message)
     return
@@ -634,8 +694,11 @@ const handleLimpiarMovCaja = () => {
 }
 
 const handleRevisarLibro = async () => {
+  // Boletas comparte la tabla Ventas con Facturas/NC -- "Revisar Libro Actual"
+  // siempre muestra el contenido completo de esa tabla.
+  const tipoConsulta = cargaSiiForm.value.tipo === 'ventas-boletas' ? 'ventas' : cargaSiiForm.value.tipo
   try {
-    const res = await axios.get(`http://localhost:3000/api/carga-sii/actual?tipo=${cargaSiiForm.value.tipo}`)
+    const res = await axios.get(`http://localhost:3000/api/carga-sii/actual?tipo=${tipoConsulta}`)
     const rows = res.data.data || []
 
     libroReportData.value = rows.map(r => ({
@@ -812,6 +875,10 @@ watch(activeTab, (newTab) => {
                   <input type="radio" v-model="cargaSiiForm.tipo" value="ventas" class="text-emerald-500 focus:ring-emerald-400" />
                   <span class="text-sm">Carga SII Ventas</span>
                 </label>
+                <label v-if="activeCompany?.id === 'ferroq'" class="flex items-center space-x-2 cursor-pointer">
+                  <input type="radio" v-model="cargaSiiForm.tipo" value="ventas-boletas" class="text-emerald-500 focus:ring-emerald-400" />
+                  <span class="text-sm">Carga SII Ventas Boletas</span>
+                </label>
               </div>
 
               <div class="flex flex-col items-center space-y-2">
@@ -983,7 +1050,7 @@ watch(activeTab, (newTab) => {
     <ReporteLibroComprasModal
       :show="showLibroModal"
       periodo="Carga Actual"
-      :tipoReporte="cargaSiiForm.tipo"
+      :tipoReporte="cargaSiiForm.tipo === 'compras' ? 'compras' : 'ventas'"
       :empresaNombre="activeCompany?.name || 'EMPRESA'"
       :reportData="libroReportData"
       @close="showLibroModal = false"

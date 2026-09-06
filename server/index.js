@@ -1246,11 +1246,15 @@ app.post('/api/ejercicio', (req, res) => {
 // Carga Archivos SII (Manten.frm -> Carga Archivos SII)
 // Recibe las filas ya parseadas del CSV del SII (Compras o Ventas), trunca la
 // tabla cruda correspondiente y la reemplaza por el contenido del archivo.
+// "ventas-boletas" (exclusivo de Ferroq por ahora) es un caso especial: el SII
+// entrega las Boletas en un reporte aparte del RCV de Ventas normal, así que
+// en vez de truncar toda la tabla Ventas sólo se reemplazan las filas Tdoc=34
+// ya cargadas, sin tocar las Facturas/Notas de Crédito que ya estén ahí.
 app.post('/api/carga-sii/procesar', (req, res) => {
   const { tipo, rows } = req.body;
 
-  if (tipo !== 'compras' && tipo !== 'ventas') {
-    return res.status(400).json({ error: 'Tipo inválido. Debe ser "compras" o "ventas".' });
+  if (tipo !== 'compras' && tipo !== 'ventas' && tipo !== 'ventas-boletas') {
+    return res.status(400).json({ error: 'Tipo inválido. Debe ser "compras", "ventas" o "ventas-boletas".' });
   }
   if (!Array.isArray(rows) || rows.length === 0) {
     return res.status(400).json({ error: 'El archivo no contiene registros para procesar.' });
@@ -1260,7 +1264,11 @@ app.post('/api/carga-sii/procesar', (req, res) => {
 
   try {
     const procesarCarga = req.db.transaction(() => {
-      req.db.prepare(`DELETE FROM ${tabla}`).run();
+      if (tipo === 'ventas-boletas') {
+        req.db.prepare(`DELETE FROM Ventas WHERE Tdoc = '34'`).run();
+      } else {
+        req.db.prepare(`DELETE FROM ${tabla}`).run();
+      }
 
       const insertStmt = req.db.prepare(`
         INSERT INTO ${tabla} (Tdoc, Numdoc, Fecha, Rut, Rsoc, Neto, Exen, Iva, Total)
@@ -1383,7 +1391,9 @@ app.post('/api/rcv/procesar-sii', (req, res) => {
       const processTransaction = req.db.transaction((rows) => {
         const stmt = req.db.prepare(req.queries.saveVenta);
         rows.forEach(r => {
-          const tdoc = r.Tdoc === '33' ? 'FA' : (r.Tdoc === '61' ? 'NC' : 'FA');
+          // Mismo mapeo que Procesar_Click en RegComp.frm: 33=Factura, 34=Boleta,
+          // cualquier otro código (ej. 61=Nota de Crédito) queda como NC.
+          const tdoc = r.Tdoc === '33' ? 'FA' : (r.Tdoc === '34' ? 'BO' : 'NC');
           stmt.run(r.Rut, tdoc, r.Numdoc, r.Fecha, r.Neto, r.Iva, r.Total, periodo);
         });
       });
@@ -1615,15 +1625,20 @@ app.post('/api/contab/procesar-cv', (req, res) => {
         let lineaCounter = 0;
         ventas.forEach(r => {
           const isFA = r.Tdoc === 'FA' || r.Tdoc === '33';
-          const dhNeto = isFA ? 'C' : 'D';
-          const dhCli = isFA ? 'D' : 'C';
+          const isBO = r.Tdoc === 'BO';
+          // El .frm original agrupa Factura y Boleta igual para Neto/Iva (ambas
+          // Haber) y solo las separa en la cuenta de Cliente: Factura -> 0110,
+          // Boleta -> 0111 (Ferroq).
+          const dhNeto = (isFA || isBO) ? 'C' : 'D';
+          const dhCli = (isFA || isBO) ? 'D' : 'C';
+          const cuentaCliente = isBO ? '0111' : '0110';
 
           lineaCounter++;
           insertStmt.run(ncomp, fechaContable, lineaCounter, '0401', dhNeto, r.Neto, 'Neto de Ventas', '', '', '');
           lineaCounter++;
           insertStmt.run(ncomp, fechaContable, lineaCounter, '0115', dhNeto, r.Iva, 'Iva de Ventas', '', '', '');
           lineaCounter++;
-          insertStmt.run(ncomp, fechaContable, lineaCounter, '0110', dhCli, r.Total, 'Venta', r.Tdoc, r.Numdoc, r.Rut);
+          insertStmt.run(ncomp, fechaContable, lineaCounter, cuentaCliente, dhCli, r.Total, 'Venta', r.Tdoc, r.Numdoc, r.Rut);
         });
 
         lineasProcesadas = ventas.length;
