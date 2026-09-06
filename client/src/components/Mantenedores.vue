@@ -220,11 +220,20 @@ const CARGA_MOVCAJA_ALIASES = {
 // decodificados terminan todas comparando como "ndocumento".
 const normalizarEncabezado = (str) => (str || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
 
+// El banco a veces exporta separado por "," y a veces por ";" -- se detecta
+// mirando cuál aparece más veces en el encabezado, en vez de asumir uno fijo.
+const detectarDelimitadorCsv = (headerLine) => {
+  const puntoYComa = (headerLine.match(/;/g) || []).length
+  const coma = (headerLine.match(/,/g) || []).length
+  return puntoYComa > coma ? ';' : ','
+}
+
 const parseCsvMovCaja = (texto) => {
   const lineas = texto.split(/\r?\n/).filter((l) => l.trim().length > 0)
   if (lineas.length < 2) return []
 
-  const headers = lineas[0].split(',').map((h) => h.trim())
+  const delimitador = detectarDelimitadorCsv(lineas[0])
+  const headers = lineas[0].split(delimitador).map((h) => h.trim())
   const headersNormalizados = headers.map(normalizarEncabezado)
   const buscarIndice = (alias) => {
     for (const nombre of alias) {
@@ -244,7 +253,7 @@ const parseCsvMovCaja = (texto) => {
   }
 
   return lineas.slice(1).map((linea) => {
-    const cols = linea.split(',')
+    const cols = linea.split(delimitador)
     const documento = (cols[idx.Documento] || '').trim().toUpperCase()
 
     return {
