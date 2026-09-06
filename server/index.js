@@ -2394,6 +2394,57 @@ app.get('/api/reportes/analisis-proveedores', (req, res) => {
   }
 });
 
+// --- TRASPASOS (Traspasos.frm, exclusivo de Ferroq) ---
+// Toma los registros de CtaCte_provee con DebHab='C' (saldos a favor del
+// proveedor detectados en Análisis Ctas. Ctes.) y genera una póliza en
+// Cdiario: una línea Cuenta=0201 Debe por cada documento, más una línea
+// final Cuenta=0202 Haber por la suma total. El .frm original no numera la
+// póliza vía Numpol -- el N° de Comprobante (Text1/"C. Diario") se ingresa
+// a mano, así que se mantiene igual acá. La glosa de la línea final del .frm
+// original traía un nombre de persona hardcodeado ("Mario Muñoz"); se
+// reemplaza por una glosa genérica.
+app.post('/api/traspasos/procesar', (req, res) => {
+  const { fecha, poliza } = req.body; // fecha: YYYY-MM-DD, poliza: N° de Comprobante ingresado a mano
+  if (!fecha || !poliza) return res.status(400).json({ error: 'Fecha y N° de Comprobante son requeridos.' });
+
+  const fechaDmy = isoADmy(fecha);
+
+  try {
+    const procesar = req.db.transaction(() => {
+      const rows = req.db.prepare(`SELECT Rut, Tdoc, Numdoc, Valor FROM CtaCte_provee WHERE DebHab = 'C'`).all();
+      if (rows.length === 0) throw new Error('No hay documentos con saldo a favor del proveedor (Haber) en CtaCte_provee.');
+
+      const insertStmt = req.db.prepare(`
+        INSERT INTO Cdiario (Ncomp, Fecha, Linea, Cuenta, DebHab, Valor, Glosa, Tdoc, Numdoc, Rut)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      let linea = 0;
+      let total = 0;
+      rows.forEach(r => {
+        linea++;
+        insertStmt.run(poliza, fechaDmy, linea, '0201', 'D', r.Valor, 'Traspaso', r.Tdoc, r.Numdoc, r.Rut);
+        total += r.Valor;
+      });
+
+      linea++;
+      insertStmt.run(poliza, fechaDmy, linea, '0202', 'C', total, 'Traspaso Cuentas por Pagar', '', '', '');
+
+      return { lineas: linea, total };
+    });
+
+    const resultado = procesar();
+    res.json({
+      message: `Traspaso completado. Póliza N° ${poliza} (${resultado.lineas} líneas).`,
+      poliza,
+      lineasProcesadas: resultado.lineas,
+      total: resultado.total
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- FORMULARIOS SII (Hojas.frm) ---
 // "Tab 2" del .frm original está vacío (0 controles) -- se omite, es un
 // residuo de desarrollo sin terminar, no un tab real.

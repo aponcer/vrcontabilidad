@@ -9,6 +9,7 @@ import ProcesosBalance8Columnas from './components/ProcesosBalance8Columnas.vue'
 import ProcesosLibros from './components/ProcesosLibros.vue'
 import ProcesosEstadoResultados from './components/ProcesosEstadoResultados.vue'
 import ProcesosConsultas from './components/ProcesosConsultas.vue'
+import ProcesosTraspasos from './components/ProcesosTraspasos.vue'
 import ProcesosFormularios from './components/ProcesosFormularios.vue'
 import AnalisisClientesProveedores from './components/AnalisisClientesProveedores.vue'
 import DeclaracionesJuradas from './components/DeclaracionesJuradas.vue'
@@ -134,6 +135,7 @@ onMounted(async () => {
               <a href="#" @click.prevent="navigateTo('estadoResultados')" class="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-emerald-400">Estado Resultados</a>
               <a href="#" @click.prevent="navigateTo('libros')" class="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-emerald-400">Libros</a>
               <a href="#" @click.prevent="navigateTo('consultas')" class="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-emerald-400">Consultas</a>
+              <a v-if="activeCompany.id === 'ferroq'" href="#" @click.prevent="navigateTo('traspasos')" class="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-emerald-400">Traspasos</a>
               <a href="#" @click.prevent="navigateTo('formularios')" class="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-emerald-400">Formularios</a>
             </div>
           </div>
@@ -266,6 +268,13 @@ onMounted(async () => {
 
         <ProcesosConsultas
           v-else-if="currentView === 'consultas'"
+          :activeCompany="activeCompany"
+          @close="navigateTo('home')"
+          @set-title="handleSetTitle"
+        />
+
+        <ProcesosTraspasos
+          v-else-if="currentView === 'traspasos'"
           :activeCompany="activeCompany"
           @close="navigateTo('home')"
           @set-title="handleSetTitle"
