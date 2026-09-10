@@ -164,6 +164,18 @@ const handleValorIpcManual = (fila) => {
   fila.fechaActualizacion = hoyIso()
 }
 
+// --- Tipos de Trabajador (Activo/Adulto Mayor/Pensionado, etc.) ---
+const tiposTrabajadorList = ref([])
+
+const cargarTiposTrabajador = async () => {
+  try {
+    const res = await axios.get('http://localhost:3000/api/tipos-trabajador')
+    tiposTrabajadorList.value = res.data.data || []
+  } catch (err) {
+    console.error('Error cargando Tipos de Trabajador:', err.message)
+  }
+}
+
 // --- Personal (Maeper: ficha del trabajador) ---
 const personalFormInicial = () => ({
   rut: '', apellido: '', apellidoMaterno: '', nombres: '', cargo: '',
@@ -258,6 +270,7 @@ onMounted(() => {
   emit('set-title', 'Mantenedor de Remuneraciones')
   cargarAfp()
   cargarIsapre()
+  cargarTiposTrabajador()
   cargarValoresIpcActuales()
 })
 
@@ -710,8 +723,7 @@ const handleEliminarIsapre = async (nombre) => {
               <label class="w-28 text-right text-sm text-slate-300 font-medium">Tipo Trabajador</label>
               <select v-model="personalForm.tipoTrabajador" class="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500">
                 <option value="">Seleccionar...</option>
-                <option value="ACTIVO">ACTIVO</option>
-                <option value="PENSIONADO">PENSIONADO</option>
+                <option v-for="t in tiposTrabajadorList" :key="t.id" :value="t.id">{{ t.titulo }}</option>
               </select>
             </div>
 

@@ -359,19 +359,58 @@ try {
   configLocal = require('./config.local.example.js');
 }
 const RUT_EXCEPCION_CESANTIA = configLocal.rutExcepcionCesantia || '';
-// Mismo mecanismo, para la regla de Ferroq (Liq_suel.frm de esa empresa): a
-// este Rut se le calcula Afp e Isapre en 0 en vez del descuento normal (es el
-// dueño/socio, no un trabajador con cotizaciones regulares).
-const RUT_EXCEPCION_AFP_ISAPRE = configLocal.rutExcepcionAfpIsapre || '';
+
+// Tipos de trabajador (Activo/Adulto Mayor/Pensionado, etc.): gobiernan si se
+// calculan Cesantía, Sis+Aporte Adicional+Seguro Social+Expectativa de Vida,
+// Afp y Salud, o quedan en 0. Reemplaza el hack anterior de excepción por Rut
+// (Ferroq no modelaba "Adulto Mayor" como Tipo_trab -- usaba un Rut hardcodeado
+// para llegar al mismo resultado). Válido para cualquier empresa: si nunca usa
+// más que "ACTIVO" (como Empresa hoy), no cambia nada.
+function asegurarTipoTrabajador(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS TipoTrabajador (
+      Id TEXT PRIMARY KEY,
+      Titulo TEXT NOT NULL,
+      PagaCesantia INTEGER NOT NULL DEFAULT 1,
+      PagaSisAportes INTEGER NOT NULL DEFAULT 1,
+      PagaAfp INTEGER NOT NULL DEFAULT 1,
+      PagaSalud INTEGER NOT NULL DEFAULT 1
+    )
+  `);
+  const { n } = db.prepare(`SELECT COUNT(*) AS n FROM TipoTrabajador`).get();
+  if (n === 0) {
+    const seed = db.prepare(`
+      INSERT INTO TipoTrabajador (Id, Titulo, PagaCesantia, PagaSisAportes, PagaAfp, PagaSalud) VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    const transaccion = db.transaction(() => {
+      seed.run('ACTIVO', 'Activo', 1, 1, 1, 1);
+      seed.run('ADULTO_M', 'Adulto Mayor', 0, 0, 0, 0);
+      seed.run('PENSIONADO', 'Pensionado', 0, 0, 1, 1);
+    });
+    transaccion();
+  }
+}
 
 // 1. Calcular los haberes/descuentos base de una liquidación (dispara al perder foco
 // "Dias Trabajados" en el .frm original -> Text2_LostFocus).
+app.get('/api/tipos-trabajador', (req, res) => {
+  try {
+    asegurarTipoTrabajador(req.db);
+    const data = req.db.prepare(`SELECT Id AS id, Titulo AS titulo FROM TipoTrabajador ORDER BY rowid`).all();
+    res.json({ data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/liq-suel/base', (req, res) => {
   const { periodo, rut, dias } = req.query;
   if (!periodo || !rut) return res.status(400).json({ error: 'Periodo y Rut son obligatorios.' });
   const diasNum = Number(dias) || 30;
 
   try {
+    asegurarTipoTrabajador(req.db);
+
     const uf = req.db.prepare(`SELECT Valor FROM Uf WHERE Periodo = ?`).get(periodo);
     if (!uf) return res.status(404).json({ error: `No hay Registro de UF para el período ${periodo}.` });
     const ufValor = uf.Valor;
@@ -382,6 +421,11 @@ app.get('/api/liq-suel/base', (req, res) => {
 
     const p = req.db.prepare(req.queries.getMaeperPorRut).get(rut);
     if (!p) return res.status(404).json({ error: `No se encontró Ficha del trabajador con Rut ${rut}.` });
+
+    // Si el Tipo_trab de la Ficha no coincide con ningún tipo conocido, se
+    // calcula como Activo (todo se paga normal) en vez de zerear por error.
+    const tipoTrab = req.db.prepare(`SELECT * FROM TipoTrabajador WHERE Id = ?`).get((p.tipoTrabajador || '').trim())
+      || { PagaCesantia: 1, PagaSisAportes: 1, PagaAfp: 1, PagaSalud: 1 };
 
     // El Anticipo lo administra Anti_suel.frm (Anticipo de Sueldo), no este cálculo
     // -- se trae tal cual esté grabado en Liq_suel para este Periodo+Rut. El .frm
@@ -450,13 +494,11 @@ app.get('/api/liq-suel/base', (req, res) => {
     // El descuento legal de Salud siempre usa el % del maestro Isapre (7% base),
     // incluso si el plan está pactado en UF -- la diferencia se calcula aparte.
     let saludDescuento = redondear(totalImponible * isapreRow.Cotiza / 100);
-    // Excepción de Ferroq (ver RUT_EXCEPCION_AFP_ISAPRE): sin cotizaciones de
-    // Afp ni Isapre. Va antes del cálculo de diferenciaIsapre a propósito --
-    // el .frm original también la calcula sobre el saludDescuento ya en 0.
-    if (rut === RUT_EXCEPCION_AFP_ISAPRE) {
-      afpDescuento = 0;
-      saludDescuento = 0;
-    }
+    // Adulto Mayor no cotiza ni Afp ni Isapre (ver TipoTrabajador). Va antes del
+    // cálculo de diferenciaIsapre a propósito -- también se calcula sobre el
+    // saludDescuento ya en 0 para ese caso.
+    if (!tipoTrab.PagaAfp) afpDescuento = 0;
+    if (!tipoTrab.PagaSalud) saludDescuento = 0;
 
     let diferenciaIsapre = 0;
     if (tipoIsapre === 'UF') {
@@ -468,10 +510,15 @@ app.get('/api/liq-suel/base', (req, res) => {
     }
 
     let cesTrabajador, cesEmpresa;
-    if (String(p.tipoContrato || '').trim() === 'INDEFINIDO') {
+    const esIndefinido = String(p.tipoContrato || '').trim() === 'INDEFINIDO';
+
+    if (esIndefinido) {
       if (rut === RUT_EXCEPCION_CESANTIA) {
         cesTrabajador = 0;
         cesEmpresa = redondear(totalImponible * 0.8 / 100);
+      } else if (!tipoTrab.PagaCesantia) {
+        cesTrabajador = 0;
+        cesEmpresa = 0;
       } else {
         cesTrabajador = redondear(totalImponible * numLocal(indi.cesTrabajador) / 100);
         cesEmpresa = redondear(totalImponible * numLocal(indi.cesEmpleador) / 100);
@@ -481,11 +528,16 @@ app.get('/api/liq-suel/base', (req, res) => {
       cesEmpresa = redondear(totalImponible * (numLocal(indi.cesEmpleador) + numLocal(indi.cesTrabajador)) / 100);
     }
 
-    const sis = redondear(totalImponible * numLocal(indi.sis) / 100);
+    // Sis/Aporte Adicional/Seguro Social/Expectativa de Vida se anulan junto con
+    // la Cesantía para Adulto Mayor/Pensionado (TipoTrabajador), pero solo con
+    // contrato INDEFINIDO -- para Plazo Fijo el .frm original los calcula
+    // siempre, sin mirar el Tipo_trab, así que ese caso no cambia.
+    const pagaSisAportes = !esIndefinido || tipoTrab.PagaSisAportes;
+    const sis = pagaSisAportes ? redondear(totalImponible * numLocal(indi.sis) / 100) : 0;
     const accTrabajo = redondear(totalImponible * numLocal(indi.accidenteTrabajo) / 100);
-    const aporteAdicional = redondear(totalImponible * numLocal(indi.aporteAdicional) / 100);
-    const seguroSocial = redondear(totalImponible * numLocal(indi.seguroSocial) / 100);
-    const expectativaVida = redondear(totalImponible * numLocal(indi.expectativaVida) / 100);
+    const aporteAdicional = pagaSisAportes ? redondear(totalImponible * numLocal(indi.aporteAdicional) / 100) : 0;
+    const seguroSocial = pagaSisAportes ? redondear(totalImponible * numLocal(indi.seguroSocial) / 100) : 0;
+    const expectativaVida = pagaSisAportes ? redondear(totalImponible * numLocal(indi.expectativaVida) / 100) : 0;
 
     let haberesTributables;
     if (topeado) {
