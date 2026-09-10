@@ -280,13 +280,19 @@ const leerArchivoComoTexto = (file) => file.text()
 // (ej. "2.679.347"), así que basta con quitar los puntos.
 const numeroClp = (str) => Number((str || '').replace(/\./g, '').trim()) || 0
 
-const CARGA_MOVCAJA_ALIASES = {
-  Glosa: ['Descripcion/Glosa', 'Descripción/Glosa'],
-  Documento: ['Documento'],
-  Numdoc: ['Nº Documento', 'N° Documento', 'No Documento'],
-  Monto: ['Monto'],
-  DebHab: ['Debito/Credito', 'Débito/Crédito'],
-  Cuenta: ['Cuenta']
+// El archivo siempre viene con las columnas en el mismo orden (Glosa, Nombre,
+// Mes, Documento, Numdoc, Pago, Monto, Neto, Iva, DebHab, Cuenta, ...), así que
+// se lee por posición en vez de buscar el encabezado por nombre -- el archivo
+// real que genera mi abuelo ni siquiera nombra bien todas las columnas (la de
+// Documento queda titulada "Total", duplicado con la columna Total real del
+// final, que de todas formas siempre se ignora).
+const MOVCAJA_COL = {
+  Glosa: 0,
+  Documento: 3,
+  Numdoc: 4,
+  Monto: 6,
+  DebHab: 9,
+  Cuenta: 10
 }
 
 const parseCsvMovCaja = (texto) => {
@@ -294,39 +300,21 @@ const parseCsvMovCaja = (texto) => {
   if (lineas.length < 2) return []
 
   const delimitador = detectarDelimitadorCsv(lineas[0])
-  const headers = lineas[0].split(delimitador).map((h) => h.trim())
-  const headersNormalizados = headers.map(normalizarEncabezado)
-  const buscarIndice = (alias) => {
-    for (const nombre of alias) {
-      const i = headersNormalizados.indexOf(normalizarEncabezado(nombre))
-      if (i !== -1) return i
-    }
-    return -1
-  }
-
-  const idx = Object.fromEntries(
-    Object.entries(CARGA_MOVCAJA_ALIASES).map(([campo, alias]) => [campo, buscarIndice(alias)])
-  )
-
-  const faltantes = Object.entries(idx).filter(([, i]) => i === -1).map(([campo]) => campo)
-  if (faltantes.length > 0) {
-    throw new Error(`No se encontraron en el CSV las columnas para: ${faltantes.join(', ')}.`)
-  }
 
   return lineas.slice(1).map((linea) => {
     const cols = linea.split(delimitador)
-    const documento = (cols[idx.Documento] || '').trim().toUpperCase()
+    const documento = (cols[MOVCAJA_COL.Documento] || '').trim().toUpperCase()
 
     return {
-      cuentaNombre: (cols[idx.Cuenta] || '').trim(),
-      debHab: (cols[idx.DebHab] || '').trim().toUpperCase(),
-      valor: numeroClp(cols[idx.Monto]),
+      cuentaNombre: (cols[MOVCAJA_COL.Cuenta] || '').trim(),
+      debHab: (cols[MOVCAJA_COL.DebHab] || '').trim().toUpperCase(),
+      valor: numeroClp(cols[MOVCAJA_COL.Monto]),
       // La Glosa de Facturas ya encontradas se resuelve en el backend según el
       // documento; esta queda como texto de respaldo (no factura, o factura
       // que aún no está cargada en Lcompra/Lventa).
-      glosa: (cols[idx.Glosa] || '').trim(),
+      glosa: (cols[MOVCAJA_COL.Glosa] || '').trim(),
       tdoc: DOCUMENTO_A_TDOC[documento] || '',
-      numdoc: (cols[idx.Numdoc] || '').trim()
+      numdoc: (cols[MOVCAJA_COL.Numdoc] || '').trim()
     }
   })
 }
