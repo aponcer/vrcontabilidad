@@ -5,7 +5,10 @@
   "main": "index.js",
   "scripts": {
     "dev": "nodemon index.js",
-    "start": "node index.js"
+    "start": "node index.js",
+    "import": "node import_data.js",
+    "import:empresa": "node import_data.js empresa",
+    "import:ferroq": "node import_data.js ferroq"
   },
   "keywords": [],
   "author": "",

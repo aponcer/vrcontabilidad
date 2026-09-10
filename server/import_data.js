@@ -60,10 +60,23 @@ function processAndFilterInsertsOnly(rawContent) {
 // Los .sql viven en la carpeta sql/ del proyecto (no en server/).
 const sqlDir = path.join(__dirname, '..', 'sql');
 
-const dataImports = [
-  { sqlFile: 'datos_empresa.sql', dbFile: 'empresa.sqlite' },
-  { sqlFile: 'datos_ferroq.sql', dbFile: 'ferroq.sqlite' },
+// Uso: node import_data.js [empresa|ferroq] -- sin argumento reimporta ambas
+// (comportamiento de siempre); con un argumento, solo esa empresa, para poder
+// probar/reimportar una sola base sin tocar la otra.
+const dataImportsCompletos = [
+  { nombre: 'empresa', sqlFile: 'datos_empresa.sql', dbFile: 'empresa.sqlite' },
+  { nombre: 'ferroq', sqlFile: 'datos_ferroq.sql', dbFile: 'ferroq.sqlite' },
 ];
+
+const filtro = process.argv[2];
+if (filtro && !dataImportsCompletos.some((d) => d.nombre === filtro)) {
+  console.error(`Empresa desconocida: "${filtro}". Usa "empresa" o "ferroq" (o nada, para ambas).`);
+  process.exit(1);
+}
+
+const dataImports = filtro
+  ? dataImportsCompletos.filter((d) => d.nombre === filtro)
+  : dataImportsCompletos;
 
 // Vacía todas las tablas de usuario antes de reimportar, sin tocar el esquema
 // (que ya tiene tablas/columnas agregadas en caliente por el backend -- Hojas,
