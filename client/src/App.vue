@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, watchEffect, onMounted } from 'vue'
+import { ref, computed, watch, watchEffect, onMounted } from 'vue'
 import axios from 'axios'
 import Mantenedores from './components/Mantenedores.vue'
 import ProcesosComprasVentas from './components/ProcesosComprasVentas.vue'
@@ -70,6 +70,14 @@ const capitalize = (str) => {
   if (!str) return ''
   return str.charAt(0).toUpperCase() + str.slice(1)
 }
+
+// Título grande de la pantalla de inicio: Ferroq muestra su nombre completo
+// (igual que "Ferquimica" en el Menu.frm original), en vez de la sigla corta
+// que se usa en el selector de empresas.
+const tituloPrincipal = computed(() => {
+  if (activeCompany.value?.id === 'ferroq') return 'Ferquímica'
+  return activeCompany.value?.name || ''
+})
 
 watchEffect(() => {
   const empresa = activeCompany.value?.name || 'Sin Empresa'
@@ -211,7 +219,7 @@ onMounted(async () => {
         <div v-if="currentView === 'home'" class="flex-1 flex flex-col items-center justify-center space-y-4">
           <div class="p-8 bg-slate-800/90 border border-slate-700 rounded-2xl shadow-xl text-center max-w-md w-full">
             <h1 class="text-2xl font-bold text-emerald-400 italic tracking-wide">
-              {{ activeCompany.name }}
+              {{ tituloPrincipal }}
             </h1>
             <p class="text-xs text-slate-400 mt-2">Sistema Contable & Remuneraciones</p>
           </div>
