@@ -138,6 +138,41 @@ watch(() => form.value.cuenta, (nuevaCuenta) => {
   }
 })
 
+// Autocompletado de Razón Social: en vez de un desplegable, se escribe parte
+// del nombre y se filtra en vivo -- para cuando se sabe el nombre pero no el
+// Rut de memoria.
+const razonSocialTexto = ref('')
+const mostrarSugerenciasTerceros = ref(false)
+
+const sugerenciasTerceros = computed(() => {
+  const q = razonSocialTexto.value.trim().toLowerCase()
+  if (!q) return []
+  return tercerosFiltrados.value
+    .filter(t => (t.nombre || '').toLowerCase().includes(q))
+    .slice(0, 8)
+})
+
+const handleSeleccionarTercero = (t) => {
+  form.value.rut = t.rut
+  razonSocialTexto.value = t.nombre
+  mostrarSugerenciasTerceros.value = false
+}
+
+// Al salir del campo, descarta texto tipeado que no llevó a una selección y
+// muestra el nombre que corresponda al Rut actual (si hay uno).
+const handleRazonSocialBlur = () => {
+  mostrarSugerenciasTerceros.value = false
+  const encontrado = tercerosFiltrados.value.find(t => t.rut === form.value.rut)
+  razonSocialTexto.value = encontrado ? encontrado.nombre : ''
+}
+
+// Mantiene el texto sincronizado con el Rut cuando este cambia por otra vía
+// (tecleado manual del Rut, autocompletado por Numdoc, Cargar Línea, Limpiar).
+watch([() => form.value.rut, tercerosFiltrados], ([nuevoRut, terceros]) => {
+  const encontrado = terceros.find(t => t.rut === nuevoRut)
+  razonSocialTexto.value = encontrado ? encontrado.nombre : ''
+})
+
 // Buscar Documento al perder foco en Numdoc (Text6_LostFocus)
 const handleBuscarNumdoc = async () => {
   if (!form.value.numdoc.trim() || !form.value.cuenta) return
@@ -236,6 +271,7 @@ const handleLimpiarDetalle = () => {
   form.value.numdoc = ''
   form.value.rut = ''
   form.value.glosa = ''
+  razonSocialTexto.value = ''
 }
 
 const handleLimpiar = () => {
@@ -361,10 +397,29 @@ const handleImprimir = () => {
           <!-- Rut / Terceros -->
           <div class="grid grid-cols-12 gap-3 items-center">
             <label class="col-span-2 text-right text-sm text-slate-300 font-medium">Razón Social</label>
-            <select v-model="form.rut" class="col-span-7 bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500">
-              <option value="">-- Seleccionar Rut --</option>
-              <option v-for="t in tercerosFiltrados" :key="t.rut" :value="t.rut">{{ t.nombre }}</option>
-            </select>
+            <div class="col-span-7 relative">
+              <input
+                v-model="razonSocialTexto"
+                @input="mostrarSugerenciasTerceros = true"
+                @focus="mostrarSugerenciasTerceros = true"
+                @blur="handleRazonSocialBlur"
+                type="text"
+                autocomplete="off"
+                placeholder="Escribe parte del nombre..."
+                class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500"
+              />
+              <ul
+                v-if="mostrarSugerenciasTerceros && sugerenciasTerceros.length > 0"
+                class="absolute z-20 mt-1 w-full bg-slate-800 border border-slate-700 rounded shadow-xl max-h-48 overflow-y-auto">
+                <li
+                  v-for="t in sugerenciasTerceros"
+                  :key="t.rut"
+                  @mousedown.prevent="handleSeleccionarTercero(t)"
+                  class="px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-700 cursor-pointer truncate">
+                  {{ t.nombre }} <span class="text-slate-500 font-mono text-xs">({{ t.rut }})</span>
+                </li>
+              </ul>
+            </div>
             <input v-model="form.rut" type="text" placeholder="RUT" class="col-span-3 bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm font-mono text-slate-100 text-center" />
           </div>
 
