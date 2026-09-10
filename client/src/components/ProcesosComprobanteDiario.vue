@@ -405,7 +405,7 @@ const handleImprimir = () => {
                 @blur="handleRazonSocialBlur"
                 type="text"
                 autocomplete="off"
-                placeholder="Escribe parte del nombre..."
+                placeholder="Nombre Empresa o Razón Social"
                 class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500"
               />
               <ul
