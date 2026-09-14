@@ -1,6 +1,8 @@
 <script setup>
 import { ref, computed, watch, watchEffect, onMounted } from 'vue'
 import axios from 'axios'
+import { CHANGELOG } from './changelog'
+import NovedadesModal from './components/NovedadesModal.vue'
 import Mantenedores from './components/Mantenedores.vue'
 import ProcesosComprasVentas from './components/ProcesosComprasVentas.vue'
 import ProcesosContabComprasVentas from './components/ProcesosContabComprasVentas.vue'
@@ -109,7 +111,45 @@ onMounted(async () => {
   } catch (err) {
     serverStatus.value = 'Error al conectar'
   }
+  revisarNovedades()
 })
+
+// Aviso de "Novedades": muestra las entradas del changelog más nuevas que la
+// última versión que este navegador ya vio (guardada en localStorage, así que
+// es por computador, no por usuario ni por empresa seleccionada).
+const showNovedades = ref(false)
+const entradasNovedades = ref([])
+
+const revisarNovedades = () => {
+  try {
+    const vista = localStorage.getItem('ultimaVersionVista')
+    const idx = CHANGELOG.findIndex((e) => e.version === vista)
+    // idx === -1: nunca visto (o versión desconocida) -> se muestra todo el historial.
+    // idx === 0: ya vio la última versión -> no se muestra nada.
+    entradasNovedades.value = idx === -1 ? CHANGELOG : CHANGELOG.slice(0, idx)
+    if (entradasNovedades.value.length > 0) {
+      showNovedades.value = true
+    }
+  } catch {
+    // localStorage puede no estar disponible (modo privado, etc.) -- se omite el aviso.
+  }
+}
+
+// Botón "Novedades" del footer: abre el modal a demanda con todo el
+// historial, sin importar si ya se vio antes.
+const handleVerNovedades = () => {
+  entradasNovedades.value = CHANGELOG
+  showNovedades.value = true
+}
+
+const cerrarNovedades = () => {
+  showNovedades.value = false
+  try {
+    localStorage.setItem('ultimaVersionVista', CHANGELOG[0].version)
+  } catch {
+    // ignorar si localStorage no está disponible
+  }
+}
 </script>
 
 <template>
@@ -333,10 +373,15 @@ onMounted(async () => {
         <!-- Footer -->
         <div class="mt-4 p-3 rounded-lg bg-slate-900/60 border border-slate-700/80 flex items-center justify-between text-xs">
           <span class="text-slate-400">Estado Backend: <strong class="text-slate-200">{{ serverStatus }}</strong></span>
+          <button @click="handleVerNovedades" class="text-emerald-400 hover:text-emerald-300 font-semibold underline decoration-dotted underline-offset-2 cursor-pointer transition-colors">
+            Novedades
+          </button>
           <span class="text-slate-500">Base de datos: <strong class="text-slate-300">SQLite ({{ activeCompany.dbFile }})</strong></span>
         </div>
       </main>
 
     </div>
+
+    <NovedadesModal :show="showNovedades" :entradas="entradasNovedades" @close="cerrarNovedades" />
   </div>
 </template>
