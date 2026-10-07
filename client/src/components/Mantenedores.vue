@@ -82,9 +82,10 @@ const CARGA_SII_ALIASES_COMPRAS = {
   OtroImpValor: ['Valor Otro Impuesto']
 }
 
-// Convierte "DD/MM/AAAA" (formato del SII) a "AAAA-MM-DD" (formato usado en toda la app)
+// Convierte "DD/MM/AAAA" o "DD-MM-AAAA" (el SII exporta con cualquiera de los
+// dos separadores según el reporte) a "AAAA-MM-DD" (formato usado en toda la app)
 const fechaSiiAIso = (fecha) => {
-  const partes = fecha.split('/')
+  const partes = fecha.split(/[-/]/)
   if (partes.length !== 3) return fecha
   const [d, m, y] = partes
   return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
@@ -148,16 +149,24 @@ const parseCsvSii = (texto, tipo) => {
     let exen = exenCsv
     let totalFinal = total
 
+    // Documento exento con el monto duplicado en Monto Exento (Neto e IVA
+    // llegan en 0, el Total completo vive en Exento): pasa con Tipo Doc 34
+    // (Factura Exenta), 61 (Nota de Crédito) y 110 (Factura de Exportación),
+    // entre otros -- en vez de enumerar cada código del SII, se detecta por
+    // la forma de los datos, para que cubra también el próximo código exento
+    // que aparezca sin tener que acordarnos de agregarlo a mano.
+    const esExentoConMontoDuplicado = netoCsv === 0 && iva === 0 && exenCsv !== 0
+
     if (esCompras) {
       const otroImpCodigo = (cols[idx.OtroImpCodigo] || '').trim()
       const otroImpValor = Number(cols[idx.OtroImpValor]) || 0
       const esMarcaDeNetoRoto = otroImpValor === 1 && otroImpCodigo === '28'
 
-      if (tdocCsv === '34') {
-        // Tipo Doc 34 (Factura Exenta): el archivo no trae Neto/Exento/IVA
-        // para estas filas (llegan en 0), solo el Monto Total. Se repite el
-        // Total en el Neto para no perder el monto (el Tdoc de igual forma
-        // pasa a "33" abajo, como todos los no-61).
+      if (esExentoConMontoDuplicado) {
+        // Se traslada el monto a Neto para no perderlo (si no, quedaría
+        // duplicado: en Neto y en Exen a la vez) y Exen se deja en 0. El Tdoc
+        // de salida sigue su propia regla más abajo (61 se mantiene, el
+        // resto -- incluido 110 -- pasa a "33").
         neto = total
         exen = 0
         totalFinal = total
@@ -178,10 +187,17 @@ const parseCsvSii = (texto, tipo) => {
         totalFinal = exen + neto + iva
       }
     } else {
-      // Si no viene IVA (documentos exentos, ej. Tdoc 34), el Neto pasa a ser el
-      // Total de la línea en vez del "Monto Neto" del CSV (que llega en 0), para
-      // no perder el monto en Ventas, donde el proceso posterior no suma Exen.
-      neto = iva === 0 ? total : netoCsv
+      if (esExentoConMontoDuplicado) {
+        // Mismo tratamiento que en Compras -- ver esExentoConMontoDuplicado
+        // más arriba. El Tdoc de salida sigue su propia regla más abajo.
+        neto = total
+        exen = 0
+      } else {
+        // Si no viene IVA (otros documentos exentos), el Neto pasa a ser el
+        // Total de la línea en vez del "Monto Neto" del CSV (que llega en 0),
+        // para no perder el monto -- acá el proceso posterior no suma Exen.
+        neto = iva === 0 ? total : netoCsv
+      }
     }
 
     return {

@@ -15,15 +15,25 @@ const tituloReporte = computed(() => {
   return props.tipoReporte === 'ventas' ? 'Libro de Ventas' : 'Libro de Compras'
 })
 
-// Si es compras agrupa por Tdoc; si es ventas agrupa por el mes extraído de la Fecha (YYYY-MM)
+// Una Nota de Crédito (Tdoc 61) es un ingreso, no un egreso -- resta del Total
+// General en vez de sumar. El subtotal POR GRUPO se muestra en positivo a
+// propósito (agrupar por Tdoc ya dice que ese bloque es "61", así que el
+// signo se sobreentiende -- solo el Total General necesita restarlo de verdad).
+const signoFila = (row) => (row.Tdoc === '61' ? -1 : 1)
+
+// Si es compras agrupa por Tdoc; si es ventas agrupa por el mes extraído de la
+// Fecha (YYYY-MM). En ambos casos, las Notas de Crédito (Tdoc 61) siempre van
+// en su propio grupo aparte, sin mezclarse con el mes al que pertenezcan --
+// así queda su propio subtotal, separado de las Facturas/Boletas del período.
 const groupedData = computed(() => {
   if (!props.reportData || props.reportData.length === 0) return {}
 
   return props.reportData.reduce((acc, row) => {
-    // Si es ventas, agrupamos por los primeros 7 caracteres de Fecha (ej: "2026-07")
-    const groupKey = props.tipoReporte === 'ventas' 
-      ? (row.Fecha ? row.Fecha.substring(0, 7) : 'SIN FECHA')
-      : (row.Tdoc || 'OTROS')
+    const groupKey = row.Tdoc === '61'
+      ? '61'
+      : props.tipoReporte === 'ventas'
+        ? (row.Fecha ? row.Fecha.substring(0, 7) : 'SIN FECHA')
+        : (row.Tdoc || 'OTROS')
 
     if (!acc[groupKey]) {
       acc[groupKey] = {
@@ -48,10 +58,11 @@ const totalGeneral = computed(() => {
   if (!props.reportData) return { neto: 0, exen: 0, iva: 0, total: 0 }
   return props.reportData.reduce(
     (acc, row) => {
-      acc.neto += Number(row.Neto || 0)
-      acc.exen += Number(row.Exen || 0)
-      acc.iva += Number(row.Iva || 0)
-      acc.total += Number(row.Total || 0)
+      const signo = signoFila(row)
+      acc.neto += Number(row.Neto || 0) * signo
+      acc.exen += Number(row.Exen || 0) * signo
+      acc.iva += Number(row.Iva || 0) * signo
+      acc.total += Number(row.Total || 0) * signo
       return acc
     },
     { neto: 0, exen: 0, iva: 0, total: 0 }
