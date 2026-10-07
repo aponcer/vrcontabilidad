@@ -105,8 +105,16 @@ const valoresIpc = ref([
 const hoyIso = () => new Date().toISOString().split('T')[0]
 const periodoActual = () => hoyIso().replace(/-/g, '').substring(0, 6) // AAAAMM
 
+// Mi abuelo liquida las remuneraciones con un mes de desfase: cuando actualiza
+// el UF/UTM, el valor corresponde al período ANTERIOR (ej. hoy es octubre pero
+// está liquidando sueldos de septiembre, período 202609), no al mes actual.
+// Este campo permite escribir ese período a mano; si se deja vacío se usa el
+// mes actual como antes.
+const periodoManual = ref('')
+const periodoEfectivo = () => periodoManual.value.trim() || periodoActual()
+
 const cargarValoresIpcActuales = async () => {
-  const periodo = periodoActual()
+  const periodo = periodoEfectivo()
   try {
     const [resUf, resUtm] = await Promise.all([
       axios.get(`http://localhost:3000/api/uf/${periodo}`),
@@ -329,7 +337,7 @@ const handleGrabar = async () => {
       progreso.value = 100
 
     } else if (activeTab.value === 'valoresIpc') {
-      const periodo = periodoActual()
+      const periodo = periodoEfectivo()
       const resUtm = await run(async () => {
         await axios.post('http://localhost:3000/api/uf', {
           periodo, valor: valoresIpc.value[0].valor,
@@ -634,13 +642,20 @@ const handleEliminarIsapre = async (nombre) => {
 
         <!-- Actualizar valores IPC (Uf + Utm fusionados) -->
         <div v-else-if="activeTab === 'valoresIpc'" class="space-y-4 py-4 min-h-80">
-          <div class="flex justify-center">
+          <div class="flex justify-center items-center gap-3">
             <button
               @click="handleActualizarMindicador"
               :disabled="cargando"
               class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold px-4 py-2 rounded text-sm shadow transition-colors cursor-pointer">
               {{ cargando ? 'Actualizando...' : 'Actualizar desde mindicador.cl' }}
             </button>
+            <input
+              v-model="periodoManual"
+              @blur="cargarValoresIpcActuales"
+              @keyup.enter="cargarValoresIpcActuales"
+              type="text" placeholder="Periodo a Actualizar (ej: 202609)"
+              title="Déjalo vacío para usar el mes actual. Sirve para actualizar un período anterior (ej. al liquidar sueldos con un mes de desfase)."
+              class="w-56 bg-slate-800 border border-slate-700 rounded px-3 py-2 text-sm font-mono text-slate-100 focus:outline-none focus:border-emerald-500" />
           </div>
 
           <div class="bg-slate-900/60 border border-slate-700 rounded-lg overflow-hidden max-w-2xl mx-auto">
