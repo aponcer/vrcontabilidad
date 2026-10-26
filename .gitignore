@@ -9,6 +9,7 @@ node_modules/
 # Exports/backups con datos reales
 server/backup_pre_reimport_*/
 sql/datos_*.sql
+*_dump.sql
 sql/*.rar
 
 # Config local / secretos (nombres de empresas reales, RUTs, reglas
