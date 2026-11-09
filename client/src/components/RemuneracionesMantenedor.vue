@@ -192,6 +192,16 @@ const personalFormInicial = () => ({
   aguinaldo: '', comisiones: '', ctaCte: '', tipoContrato: '', fechaIngreso: '', fechaTermino: ''
 })
 const personalForm = ref(personalFormInicial())
+const personalList = ref([])
+
+const cargarPersonalList = async () => {
+  try {
+    const res = await axios.get('http://localhost:3000/api/maeper/activos')
+    personalList.value = res.data.data || []
+  } catch (err) {
+    console.error('Error cargando lista de personal:', err.message)
+  }
+}
 
 const handleRutPersonalBlur = async () => {
   const rut = personalForm.value.rut.trim().toUpperCase()
@@ -280,6 +290,7 @@ onMounted(() => {
   cargarIsapre()
   cargarTiposTrabajador()
   cargarValoresIpcActuales()
+  cargarPersonalList()
 })
 
 // --- Acción única "Grabar" (el .frm original no tiene botón de eliminar en
@@ -381,6 +392,7 @@ const handleGrabar = async () => {
         ctaCte: p.ctaCte || 0
       }), 'Guardando...')
       handleLimpiar()
+      await cargarPersonalList()
       estadoMensaje.value = `Ficha de ${nombreCompleto || rut} guardada.`
       progreso.value = 100
     }
@@ -698,13 +710,21 @@ const handleEliminarIsapre = async (nombre) => {
           <div class="grid grid-cols-2 gap-x-6 gap-y-3 max-w-3xl mx-auto">
             <div class="flex items-center space-x-3 col-span-2">
               <label class="w-28 text-right text-sm text-slate-300 font-medium">Rut</label>
+              <select
+                :value="personalForm.rut"
+                @change="personalForm.rut = $event.target.value; handleRutPersonalBlur()"
+                title="Selecciona un trabajador ya existente para cargar su ficha."
+                class="w-64 bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500">
+                <option value="">-- Trabajador existente --</option>
+                <option v-for="p in personalList" :key="p.rut" :value="p.rut">{{ p.apater }} {{ p.amater }}, {{ p.nombres }} ({{ p.rut }})</option>
+              </select>
               <input
                 v-model="personalForm.rut"
                 @blur="handleRutPersonalBlur"
                 @focus="$event.target.select()"
                 type="text" placeholder="12345678-9"
                 title="Al salir del campo (Tab) se carga la ficha completa si el Rut ya existe."
-                class="w-48 bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm font-mono text-slate-100 focus:outline-none focus:border-emerald-500" />
+                class="w-40 bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm font-mono text-slate-100 focus:outline-none focus:border-emerald-500" />
             </div>
             <div class="flex items-center space-x-3 col-span-2">
               <label class="w-28 text-right text-sm text-slate-300 font-medium">Apellido</label>

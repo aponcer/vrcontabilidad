@@ -103,6 +103,12 @@ const getStatusBadgeClass = (status) => {
   }
 }
 
+const cambiarEmpresa = (comp) => {
+  if (comp.status === 'unconfigured') return
+  activeCompany.value = comp
+  closeMenus()
+}
+
 onMounted(async () => {
   cargarEmpresas()
   try {
@@ -240,7 +246,7 @@ const cerrarNovedades = () => {
               v-for="comp in companies" 
               :key="comp.id"
               :disabled="comp.status === 'unconfigured'"
-              @click="comp.status !== 'unconfigured' && (activeCompany = comp, closeMenus())" 
+              @click="cambiarEmpresa(comp)"
               class="w-full text-left px-4 py-2.5 text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer">
               
               <div class="flex items-center space-x-2.5">
@@ -267,105 +273,105 @@ const cerrarNovedades = () => {
 
         <Mantenedores
           v-else-if="currentView === 'mantenciones'"
-          :activeCompany="activeCompany"
+          :key="activeCompany.id" :activeCompany="activeCompany"
           @close="navigateTo('home')"
           @set-title="handleSetTitle"
         />
 
         <ProcesosComprasVentas
           v-else-if="currentView === 'comprasVentas'"
-          :activeCompany="activeCompany"
+          :key="activeCompany.id" :activeCompany="activeCompany"
           @close="navigateTo('home')"
           @set-title="handleSetTitle"
         />
 
         <ProcesosContabComprasVentas
           v-else-if="currentView === 'contabComprasVentas'"
-          :activeCompany="activeCompany"
+          :key="activeCompany.id" :activeCompany="activeCompany"
           @close="navigateTo('home')"
           @set-title="handleSetTitle"
         />
 
         <ProcesosComprobanteDiario
           v-else-if="currentView === 'comprobanteDiario'"
-          :activeCompany="activeCompany"
+          :key="activeCompany.id" :activeCompany="activeCompany"
           @close="navigateTo('home')"
           @set-title="handleSetTitle"
         />
 
         <ProcesosBalance8Columnas
           v-else-if="currentView === 'balance'"
-          :activeCompany="activeCompany"
+          :key="activeCompany.id" :activeCompany="activeCompany"
           @close="navigateTo('home')"
           @set-title="handleSetTitle"
         />
 
         <ProcesosLibros
           v-else-if="currentView === 'libros'"
-          :activeCompany="activeCompany"
+          :key="activeCompany.id" :activeCompany="activeCompany"
           @close="navigateTo('home')"
           @set-title="handleSetTitle"
         />
 
         <ProcesosEstadoResultados
           v-else-if="currentView === 'estadoResultados'"
-          :activeCompany="activeCompany"
+          :key="activeCompany.id" :activeCompany="activeCompany"
           @close="navigateTo('home')"
           @set-title="handleSetTitle"
         />
 
         <ProcesosConsultas
           v-else-if="currentView === 'consultas'"
-          :activeCompany="activeCompany"
+          :key="activeCompany.id" :activeCompany="activeCompany"
           @close="navigateTo('home')"
           @set-title="handleSetTitle"
         />
 
         <ProcesosTraspasos
           v-else-if="currentView === 'traspasos'"
-          :activeCompany="activeCompany"
+          :key="activeCompany.id" :activeCompany="activeCompany"
           @close="navigateTo('home')"
           @set-title="handleSetTitle"
         />
 
         <ProcesosFormularios
           v-else-if="currentView === 'formularios'"
-          :activeCompany="activeCompany"
+          :key="activeCompany.id" :activeCompany="activeCompany"
           @close="navigateTo('home')"
           @set-title="handleSetTitle"
         />
 
         <AnalisisClientesProveedores
           v-else-if="currentView === 'analisisCtasCtes'"
-          :activeCompany="activeCompany"
+          :key="activeCompany.id" :activeCompany="activeCompany"
           @close="navigateTo('home')"
           @set-title="handleSetTitle"
         />
 
         <DeclaracionesJuradas
           v-else-if="currentView === 'declaracionesJuradas'"
-          :activeCompany="activeCompany"
+          :key="activeCompany.id" :activeCompany="activeCompany"
           @close="navigateTo('home')"
           @set-title="handleSetTitle"
         />
 
         <RemuneracionesMantenedor
           v-else-if="currentView === 'remuMantenciones'"
-          :activeCompany="activeCompany"
+          :key="activeCompany.id" :activeCompany="activeCompany"
           @close="navigateTo('home')"
           @set-title="handleSetTitle"
         />
 
         <RemuneracionesLiquidaciones
           v-else-if="currentView === 'liquidacionSueldo'"
-          :activeCompany="activeCompany"
+          :key="activeCompany.id" :activeCompany="activeCompany"
           @close="navigateTo('home')"
           @set-title="handleSetTitle"
         />
 
         <RemuneracionesAnticipoSueldo
           v-else-if="currentView === 'anticipoSueldo'"
-          :activeCompany="activeCompany"
+          :key="activeCompany.id" :activeCompany="activeCompany"
           @close="navigateTo('home')"
           @set-title="handleSetTitle"
         />

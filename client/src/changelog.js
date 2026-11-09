@@ -7,6 +7,27 @@
 // navegador/computador, no por usuario).
 export const CHANGELOG = [
   {
+    version: '1.7.0',
+    fecha: '2026-11-09',
+    cambios: [
+      'Cambiar de empresa en el selector ahora recarga los datos del módulo en que estabas -- antes, si cambiabas de empresa estando ya adentro de un módulo (ej. Mantenedor de Remuneraciones), seguía mostrando los datos de la empresa anterior hasta que se salía y se volvía a entrar a mano.'
+    ]
+  },
+  {
+    version: '1.6.0',
+    fecha: '2026-11-09',
+    cambios: [
+      'Mantenedor de Remuneraciones: la pestaña Personal ahora tiene un desplegable con los trabajadores existentes (Rut y nombre) para cargar una ficha sin tener que saberse el Rut de memoria.'
+    ]
+  },
+  {
+    version: '1.5.0',
+    fecha: '2026-11-09',
+    cambios: [
+      'Liquidación de Sueldos (impresa): se agregó la línea "Diferencia Isapre" que faltaba -- para trabajadores con plan de salud en UF, el Total de Descuentos y el Líquido ahora sí calzan con lo que muestra la pantalla de cálculo.'
+    ]
+  },
+  {
     version: '1.4.0',
     fecha: '2026-11-09',
     cambios: [

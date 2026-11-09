@@ -79,12 +79,18 @@ const handleImprimir = () => {
               <tr>
                 <td class="py-0.5 pl-1">Gratificación</td>
                 <td class="py-0.5 text-right pr-2">{{ fmt(liquidacion.gratificacion) }}</td>
+                <td class="py-0.5 pl-4">Diferencia Isapre</td>
+                <td class="py-0.5 text-right pr-1">{{ fmt(liquidacion.diferenciaIsapre) }}</td>
+              </tr>
+              <tr>
+                <td class="py-0.5 pl-1">Comisiones</td>
+                <td class="py-0.5 text-right pr-2">{{ fmt(liquidacion.comisiones) }}</td>
                 <td class="py-0.5 pl-4">Cesantía Trabajador</td>
                 <td class="py-0.5 text-right pr-1">{{ fmt(liquidacion.cesantiaTrabajador) }}</td>
               </tr>
               <tr class="border-b border-black">
-                <td class="py-0.5 pl-1">Comisiones</td>
-                <td class="py-0.5 text-right pr-2">{{ fmt(liquidacion.comisiones) }}</td>
+                <td class="py-0.5 pl-1"></td>
+                <td class="py-0.5 text-right pr-2"></td>
                 <td class="py-0.5 pl-4">Total Leyes Sociales</td>
                 <td class="py-0.5 text-right pr-1">{{ fmt(liquidacion.totalLeyesSociales) }}</td>
               </tr>

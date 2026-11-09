@@ -728,11 +728,13 @@ function numeroALetras(numero) {
 }
 
 // Imprimir (Liq_suel.rpt): la colilla de pago individual. Réplica del SQL de
-// Crystal Report (Liq_suel INNER JOIN Maeper INNER JOIN Afp) entregado. No se
-// encontró dónde el reporte muestra Adic_isap (Diferencia Isapre) por separado
-// -- no aparece como línea propia, así que Total Leyes Sociales / Total
-// Descuentos se arman solo con Afp + Isapre + Ces_trab (+ Iut + Anticipo), sin
-// incluirlo. Tampoco selecciona Cta_Cte (aunque la columna existe), así que la
+// Crystal Report (Liq_suel INNER JOIN Maeper INNER JOIN Afp) entregado, que sí
+// selecciona Adic_isap (Diferencia Isapre) -- se agrega como línea propia en
+// Descuentos. Sin esto, un trabajador con plan de salud en UF (Diferencia
+// Isapre > 0, el monto que completa el 7% legal hasta el valor real del plan)
+// quedaba con "Total Descuentos" y "Total Haberes - Líquido" sin calzar, y la
+// línea "Salud" del impreso mostraba solo el 7% legal en vez del costo real
+// del plan. Tampoco selecciona Cta_Cte (aunque la columna existe), así que la
 // línea "Cuenta Corriente" del impreso siempre queda en 0.
 app.get('/api/reportes/liquidacion-sueldo', (req, res) => {
   const { periodo, rut } = req.query;
@@ -746,7 +748,7 @@ app.get('/api/reportes/liquidacion-sueldo', (req, res) => {
 
     const empresa = req.db.prepare(`SELECT * FROM IEmpresa LIMIT 1`).get();
 
-    const totalLeyesSociales = redondear((row.AfpDescuento || 0) + (row.IsapreDescuento || 0) + (row.Ces_trab || 0));
+    const totalLeyesSociales = redondear((row.AfpDescuento || 0) + (row.IsapreDescuento || 0) + (row.Adic_isap || 0) + (row.Ces_trab || 0));
     const totalDescuentos = redondear(totalLeyesSociales + (row.Iut || 0) + (row.Anticipo || 0));
 
     res.json({
@@ -765,6 +767,7 @@ app.get('/api/reportes/liquidacion-sueldo', (req, res) => {
         saludValor: row.Val_isap,
         saludUnidad: String(row.Tipo_isap || '').trim() === 'UF' ? 'UF' : '%',
         saludDescuento: row.IsapreDescuento,
+        diferenciaIsapre: row.Adic_isap || 0,
         cesantiaTrabajador: row.Ces_trab,
         totalLeyesSociales,
         haberesImponibles: row.Hab_imp,
