@@ -17,7 +17,7 @@ export const CHANGELOG = [
     version: '1.6.0',
     fecha: '2026-11-09',
     cambios: [
-      'Mantenedor de Remuneraciones: la pestaña Personal ahora tiene un desplegable con los trabajadores existentes (Rut y nombre) para cargar una ficha sin tener que saberse el Rut de memoria.'
+      'Mantenedor de Remuneraciones: en la pestaña Personal, el campo Rut ahora autocompleta -- al hacer clic o escribir aparece la lista de trabajadores existentes (Rut y nombre) para cargar una ficha sin tener que saberse el Rut de memoria.'
     ]
   },
   {

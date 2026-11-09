@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import axios from 'axios'
 import BarraProgreso from './BarraProgreso.vue'
 import { useBarraProgreso } from '../composables/useBarraProgreso'
@@ -201,6 +201,26 @@ const cargarPersonalList = async () => {
   } catch (err) {
     console.error('Error cargando lista de personal:', err.message)
   }
+}
+
+// Autocompletado sobre el mismo campo Rut: al hacer clic (o tipear) aparece
+// la lista de trabajadores existentes filtrada por Rut o nombre, igual que
+// el autocompletado de Razón Social en Comprobante Diario.
+const mostrarSugerenciasPersonal = ref(false)
+
+const sugerenciasPersonal = computed(() => {
+  const q = personalForm.value.rut.trim().toLowerCase()
+  return personalList.value
+    .filter((p) => !q
+      || p.rut.toLowerCase().includes(q)
+      || `${p.apater} ${p.amater} ${p.nombres}`.toLowerCase().includes(q))
+    .slice(0, 8)
+})
+
+const handleSeleccionarPersonal = (p) => {
+  mostrarSugerenciasPersonal.value = false
+  personalForm.value.rut = p.rut
+  handleRutPersonalBlur()
 }
 
 const handleRutPersonalBlur = async () => {
@@ -710,21 +730,28 @@ const handleEliminarIsapre = async (nombre) => {
           <div class="grid grid-cols-2 gap-x-6 gap-y-3 max-w-3xl mx-auto">
             <div class="flex items-center space-x-3 col-span-2">
               <label class="w-28 text-right text-sm text-slate-300 font-medium">Rut</label>
-              <select
-                :value="personalForm.rut"
-                @change="personalForm.rut = $event.target.value; handleRutPersonalBlur()"
-                title="Selecciona un trabajador ya existente para cargar su ficha."
-                class="w-64 bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500">
-                <option value="">-- Trabajador existente --</option>
-                <option v-for="p in personalList" :key="p.rut" :value="p.rut">{{ p.apater }} {{ p.amater }}, {{ p.nombres }} ({{ p.rut }})</option>
-              </select>
-              <input
-                v-model="personalForm.rut"
-                @blur="handleRutPersonalBlur"
-                @focus="$event.target.select()"
-                type="text" placeholder="12345678-9"
-                title="Al salir del campo (Tab) se carga la ficha completa si el Rut ya existe."
-                class="w-40 bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm font-mono text-slate-100 focus:outline-none focus:border-emerald-500" />
+              <div class="relative w-64">
+                <input
+                  v-model="personalForm.rut"
+                  @input="mostrarSugerenciasPersonal = true"
+                  @focus="mostrarSugerenciasPersonal = true; $event.target.select()"
+                  @blur="mostrarSugerenciasPersonal = false; handleRutPersonalBlur()"
+                  type="text" placeholder="12345678-9"
+                  autocomplete="off"
+                  title="Escribe o haz clic para ver los trabajadores existentes."
+                  class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm font-mono text-slate-100 focus:outline-none focus:border-emerald-500" />
+                <ul
+                  v-if="mostrarSugerenciasPersonal && sugerenciasPersonal.length > 0"
+                  class="absolute z-20 mt-1 w-full bg-slate-800 border border-slate-700 rounded shadow-xl max-h-48 overflow-y-auto">
+                  <li
+                    v-for="p in sugerenciasPersonal"
+                    :key="p.rut"
+                    @mousedown.prevent="handleSeleccionarPersonal(p)"
+                    class="px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-700 cursor-pointer truncate">
+                    {{ p.apater }} {{ p.amater }}, {{ p.nombres }} <span class="text-slate-500 font-mono text-xs">({{ p.rut }})</span>
+                  </li>
+                </ul>
+              </div>
             </div>
             <div class="flex items-center space-x-3 col-span-2">
               <label class="w-28 text-right text-sm text-slate-300 font-medium">Apellido</label>
