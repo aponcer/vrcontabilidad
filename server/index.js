@@ -2275,7 +2275,15 @@ app.get('/api/consultas/cuenta-corriente', (req, res) => {
 // Option1 "Clientes" y Option2 "Proveedores" existen), es código muerto de una
 // versión anterior -- igual que el "Tab 2" de Formularios SII.
 
-const TABLA_CTA_CTE = { clientes: 'CtaCte_cli', proveedores: 'CtaCte_provee' };
+// El nombre de la tabla de Clientes es igual en las 3 empresas; el de
+// Proveedores NO -- HRO usa "CtaCte_pro", Ferroq/Parcela usan "CtaCte_provee"
+// (ver tablaCtaCteProveedores en cada queries/querys_*.js). Por eso Proveedores
+// se resuelve en tiempo de ejecución contra req.queries, no con una constante fija.
+const tablaCtaCte = (queries, modo) => {
+  if (modo === 'clientes') return 'CtaCte_cli';
+  if (modo === 'proveedores') return queries.tablaCtaCteProveedores || 'CtaCte_provee';
+  return null;
+};
 const CUENTA_CTA_CTE = { clientes: '0110', proveedores: '0201' };
 
 function asegurarCtaCteTabla(db, tabla) {
@@ -2299,7 +2307,7 @@ app.post('/api/analisis-ctas-ctes/procesar', (req, res) => {
   const { modo, desde, hasta } = req.body;
   if (!desde || !hasta) return res.status(400).json({ error: 'Selecciona el rango de fechas (Desde/Hasta).' });
 
-  const tabla = TABLA_CTA_CTE[modo];
+  const tabla = tablaCtaCte(req.queries, modo);
   const cuenta = CUENTA_CTA_CTE[modo];
   if (!tabla) return res.status(400).json({ error: 'Selecciona Clientes o Proveedores.' });
 
@@ -2443,7 +2451,7 @@ function analizarCtaCte(db, tabla, revisarCeroEnGrupo) {
 
 app.post('/api/analisis-ctas-ctes/analizar', (req, res) => {
   const { modo } = req.body;
-  const tabla = TABLA_CTA_CTE[modo];
+  const tabla = tablaCtaCte(req.queries, modo);
   if (!tabla) return res.status(400).json({ error: 'Selecciona Clientes o Proveedores.' });
 
   try {
@@ -2486,23 +2494,21 @@ app.get('/api/reportes/analisis-clientes', (req, res) => {
   }
 });
 
-// Imprimir (Ana_pro.rpt): el SQL de Crystal Report entregado apunta a una
-// tabla "CtaCte_pro" (no "CtaCte_provee"). El .frm original usa "CtaCte_provee"
-// consistentemente en Procesar_Click/Analizar_Click/Revisa_saldo_pr/Anula_reg,
-// y esa es también la tabla real que ya existe con datos en Ferroq -- se
-// mantiene "CtaCte_provee" acá también, para que Procesar -> Analizar ->
-// Imprimir sea un mismo pipeline coherente en vez de leer de una tabla
-// distinta a la que se graba. Probablemente "CtaCte_pro" sea un nombre
-// desactualizado en el .rpt (mismo tipo de desfase que Resultados.rpt vs
-// Est_resul.rpt) -- avisar si en realidad son tablas distintas.
+// Imprimir (Ana_pro.rpt): el SQL de Crystal Report SÍ apuntaba correctamente a
+// "CtaCte_pro" -- la corrección anterior de este comentario (que asumía que
+// era un nombre desactualizado y mantenía "CtaCte_provee" fijo acá) estaba
+// equivocada. Confirmado con el dump real de HRO: Procesar escribe en
+// "CtaCte_pro" en esa empresa, no en "CtaCte_provee" (que ahí queda vacía).
+// Ver tablaCtaCteProveedores en queries/querys_hro.js.
 app.get('/api/reportes/analisis-proveedores', (req, res) => {
   try {
+    const tabla = tablaCtaCte(req.queries, 'proveedores');
     const rows = req.db.prepare(`
-      SELECT CtaCte_provee.Rut, CtaCte_provee.Tdoc, CtaCte_provee.Numdoc, CtaCte_provee.DebHab, CtaCte_provee.Fecha, CtaCte_provee.Valor,
+      SELECT ${tabla}.Rut, ${tabla}.Tdoc, ${tabla}.Numdoc, ${tabla}.DebHab, ${tabla}.Fecha, ${tabla}.Valor,
              Provee.Rsoc AS RazonSocial
-      FROM CtaCte_provee
-      INNER JOIN Provee ON CtaCte_provee.Rut = Provee.Rut
-      ORDER BY CtaCte_provee.Rut ASC, CtaCte_provee.Numdoc ASC
+      FROM ${tabla}
+      INNER JOIN Provee ON ${tabla}.Rut = Provee.Rut
+      ORDER BY ${tabla}.Rut ASC, ${tabla}.Numdoc ASC
     `).all();
 
     const data = rows.map((r) => ({

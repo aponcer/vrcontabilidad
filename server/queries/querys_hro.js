@@ -130,6 +130,16 @@ module.exports = {
     ORDER BY Ncomp ASC, Linea ASC
   `,
 
+  // Análisis Ctas. Ctes. (Analisis.frm) -- tabla de staging de Proveedores.
+  // En HRO la tabla real (confirmado con el dump real de la base de este
+  // cliente) es "CtaCte_pro", NO "CtaCte_provee" -- el .frm pasado como
+  // referencia resultó ser el de otra empresa (Ferroq), que sí usa
+  // "CtaCte_provee". Antes de este fix, Procesar/Analizar/Imprimir leían y
+  // escribían en "CtaCte_provee" (vacía en HRO) mientras los datos reales
+  // importados del dump quedaban en "CtaCte_pro" sin que nada los mirara --
+  // por eso el reporte de Proveedores nunca calzaba con el impreso real.
+  tablaCtaCteProveedores: 'CtaCte_pro',
+
   // Afp / Isapre (Remuner.frm). Mismo esquema (Nombre, Cotiza) en las 3 empresas.
   getAfp: `SELECT Nombre AS nombre, Cotiza AS cotizacion FROM Afp ORDER BY Nombre`,
   saveAfp: `

@@ -6,6 +6,9 @@ const base = require('./querys_hro');
 module.exports = {
   ...base,
 
+  // Igual que Ferroq, Parcela usa "CtaCte_provee" (confirmado: ya existe con datos reales).
+  tablaCtaCteProveedores: 'CtaCte_provee',
+
   deleteLdiario: `DELETE FROM Ldiario`,
   saveLdiarioLinea: `
     INSERT INTO Ldiario (Cuenta, Ncomp, Linea, Fecha, Debito, Credito, Glosa)

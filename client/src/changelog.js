@@ -7,6 +7,13 @@
 // navegador/computador, no por usuario).
 export const CHANGELOG = [
   {
+    version: '1.4.0',
+    fecha: '2026-11-09',
+    cambios: [
+      'Análisis de Proveedores: se corrigió para que Procesar/Analizar/Imprimir usen la tabla correcta de cada empresa -- en algunas empresas el reporte quedaba vacío o incompleto porque se estaba mirando una tabla distinta a la que realmente se graba.'
+    ]
+  },
+  {
     version: '1.3.0',
     fecha: '2026-11-09',
     cambios: [

@@ -6,6 +6,10 @@ const base = require('./querys_hro');
 module.exports = {
   ...base,
 
+  // A diferencia de HRO, Ferroq sí usa "CtaCte_provee" como tabla real de
+  // Análisis Ctas. Ctes. de Proveedores (confirmado: ya existe con datos reales).
+  tablaCtaCteProveedores: 'CtaCte_provee',
+
   deleteLdiario: `DELETE FROM Ldiario`,
   saveLdiarioLinea: `
     INSERT INTO Ldiario (Ncomp, Cuenta, Linea, Fecha, Debito, Credito, Saldo, Glosa)
