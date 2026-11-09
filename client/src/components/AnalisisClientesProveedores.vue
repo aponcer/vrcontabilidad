@@ -116,11 +116,11 @@ const handleImprimir = async () => {
           <div class="ml-16 space-y-3">
             <div class="flex items-center space-x-3">
               <label class="w-16 text-right text-sm text-slate-300 font-medium">Desde</label>
-              <input v-model="desde" type="date" class="bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm font-mono text-slate-100 focus:outline-none focus:border-emerald-500" />
+              <input v-model="desde" type="date" class="fecha-input bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm font-mono text-slate-100 focus:outline-none focus:border-emerald-500" />
             </div>
             <div class="flex items-center space-x-3">
               <label class="w-16 text-right text-sm text-slate-300 font-medium">Hasta</label>
-              <input v-model="hasta" type="date" class="bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm font-mono text-slate-100 focus:outline-none focus:border-emerald-500" />
+              <input v-model="hasta" type="date" class="fecha-input bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm font-mono text-slate-100 focus:outline-none focus:border-emerald-500" />
             </div>
           </div>
         </div>
@@ -171,3 +171,14 @@ const handleImprimir = async () => {
     />
   </div>
 </template>
+
+<style scoped>
+/* El icono de calendario del input de fecha viene negro por defecto -- casi
+   invisible sobre el fondo oscuro. Se invierte a blanco y se agranda un poco
+   para que sea mas facil de ver/pinchar. */
+.fecha-input::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  transform: scale(1.3);
+  cursor: pointer;
+}
+</style>
