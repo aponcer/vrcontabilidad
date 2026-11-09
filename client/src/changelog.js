@@ -7,6 +7,21 @@
 // navegador/computador, no por usuario).
 export const CHANGELOG = [
   {
+    version: '1.3.0',
+    fecha: '2026-11-09',
+    cambios: [
+      'Análisis Ctas. Ctes.: se corrigió un bug donde facturas de un mismo cliente/proveedor que ya estaban pagadas (o parcialmente pagadas) no se cancelaban ni se consolidaban en "Analizar" -- quedaban "duplicadas" en el listado en vez de desaparecer o juntarse en una sola línea con el saldo real.'
+    ]
+  },
+  {
+    version: '1.2.0',
+    fecha: '2026-10-26',
+    cambios: [
+      'Comprobante Diario: ya no se puede grabar una línea con Tipo de Documento (Factura, Nota de Crédito, etc.) si no tiene Rut -- evita que facturas de Clientes/Proveedores queden "invisibles" en el Análisis de Ctas. Ctes.',
+      'Análisis Ctas. Ctes.: se corrigió para que nunca mezcle ni borre cruzado los movimientos de dos Rut distintos que compartan el mismo número de folio.'
+    ]
+  },
+  {
     version: '1.1.0',
     fecha: '2026-09-14',
     cambios: [

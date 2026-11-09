@@ -1824,6 +1824,14 @@ app.post('/api/cdiario/linea', (req, res) => {
     return res.status(400).json({ error: 'Faltan datos obligatorios para grabar la línea.' });
   }
 
+  // Si la línea lleva Tdoc (Factura, Nota de Crédito, etc.) tiene que quedar
+  // con su Rut -- si no, la línea se vuelve invisible para Análisis Ctas.
+  // Ctes. (que hace INNER JOIN contra Clientes/Provee por Rut) sin que nadie
+  // se de cuenta, como pasó con varias facturas reales de Proveedores.
+  if ((tdoc || '').trim() && !(rut || '').trim()) {
+    return res.status(400).json({ error: 'Esta línea tiene un Tipo de Documento (Tdoc) pero no tiene Rut. Completa el Rut o la Razón Social antes de grabar.' });
+  }
+
   // El formulario manda la fecha en ISO ('AAAA-MM-DD', del <input type="date">);
   // Cdiario.Fecha se guarda en texto 'DD/MM/AAAA' en todo el resto del sistema
   // (ver /api/contab/procesar-cv), así que se normaliza acá antes de grabar.
@@ -2311,7 +2319,11 @@ app.post('/api/analisis-ctas-ctes/procesar', (req, res) => {
     const procesar = req.db.transaction(() => {
       movimientos.forEach((m) => {
         try {
-          insertar.run(m.Rut, m.Tdoc, m.Numdoc, m.Fecha, m.DebHab, m.Valor);
+          // Trim defensivo: Cdiario puede traer Rut/Numdoc con relleno de
+          // espacios en filas viejas (campo de ancho fijo heredado) -- si
+          // entra así a CtaCte_cli/provee, Analizar nunca lo va a poder
+          // juntar con la misma factura escrita limpia en otra fila.
+          insertar.run((m.Rut || '').trim(), (m.Tdoc || '').trim(), (m.Numdoc || '').trim(), m.Fecha, m.DebHab, m.Valor);
           insertados++;
         } catch (err) {
           omitidos++;
@@ -2338,28 +2350,55 @@ app.post('/api/analisis-ctas-ctes/procesar', (req, res) => {
 // TAMBIÉN: si el ÚLTIMO documento de la lista no dio exactamente 0, se queda
 // sin consolidar (el .frm original sólo cierra el último grupo cuando es 0),
 // a diferencia de Consultas.frm que sí cierra cualquier grupo final no-cero.
+//
+// DEVIACIÓN DELIBERADA del .frm original: Analizar_Click decide si sigue en
+// el mismo grupo comparando solo Numdoc (If Trim(rs!Numdoc) = Docant), sin
+// mirar el Rut, y Anula_reg tampoco filtra por Rut al borrar (Delete...where
+// Numdoc=...). Si dos Ruts distintos llegan a compartir un mismo folio, el
+// original los mezclaría o borraría cruzado -- se detectaron restos reales
+// de esto en la base de Empresa (filas con Rut en blanco duplicando Numdoc y
+// Valor de filas con Rut real). Acá se exige que Rut TAMBIÉN coincida tanto
+// para seguir acumulando en el mismo grupo como para anular, cerrando esa
+// corrupción cruzada sin tocar el resto de la lógica (chequeo intermedio de
+// Clientes, manejo del último grupo, etc. quedan igual).
+//
+// BUG DE PORT (no estaba en el .frm): el original compara "Trim(rs!Numdoc) =
+// Docant" -- SIEMPRE con Trim(), porque Numdoc venía de un campo de ancho
+// fijo con relleno de espacios. Esta función comparaba Numdoc/Rut tal cual,
+// sin trim -- así que una fila vieja con Numdoc='762       ' (con relleno) y
+// una fila nueva con Numdoc='762' (limpia) quedaban como "documentos"
+// distintos para siempre, nunca se neteaban entre sí por más que Analizar se
+// corriera. Se detectó con datos reales (facturas 762/764/587 de Clientes
+// que debían quedar en $0 o consolidadas y no pasaba nada). Ahora se compara
+// SIEMPRE con Trim(), igual que el original; como dos filas del mismo grupo
+// pueden tener el Numdoc/Rut escrito distinto a nivel de bytes (con o sin
+// relleno), el borrado del grupo ya no usa un solo valor "representativo"
+// sino la clave EXACTA de cada fila que entró al grupo, para no dejar
+// huérfana la variante con relleno.
 function analizarCtaCte(db, tabla, revisarCeroEnGrupo) {
-  const rows = db.prepare(`SELECT Rut, Tdoc, Numdoc, DebHab, Fecha, Valor FROM ${tabla} ORDER BY Rut, Numdoc`).all();
+  const rows = db.prepare(`SELECT Rut, Tdoc, Numdoc, DebHab, Fecha, Valor FROM ${tabla} ORDER BY TRIM(Rut), TRIM(Numdoc)`).all();
   if (rows.length === 0) return { anulados: 0, consolidados: 0 };
 
-  const deleteNumdoc = db.prepare(`DELETE FROM ${tabla} WHERE Numdoc = ?`);
   const deleteNumdocRut = db.prepare(`DELETE FROM ${tabla} WHERE Numdoc = ? AND Rut = ?`);
   const insertConsolidado = db.prepare(`INSERT INTO ${tabla} (Rut, Tdoc, Numdoc, Fecha, DebHab, Valor) VALUES (?, ?, ?, ?, ?, ?)`);
 
   let saldo = 0;
-  let docant = null;
-  let rutant = null;
+  let docant = null; // Numdoc del grupo actual, ya trimeado
+  let rutant = null; // Rut del grupo actual, ya trimeado
   let fecant = null;
   let anulados = 0;
   let consolidados = 0;
+  let clavesGrupo = []; // {rut, numdoc} tal cual están en la fila (sin trim), para poder borrar cada variante real
 
-  const anulaReg = (numdoc) => {
-    deleteNumdoc.run(numdoc);
+  const borrarClaves = (claves) => claves.forEach((c) => deleteNumdocRut.run(c.numdoc, c.rut));
+
+  const anulaReg = (claves) => {
+    borrarClaves(claves);
     anulados++;
   };
 
-  const revisaSaldo = (rut, numdoc, fecha, saldoActual) => {
-    deleteNumdocRut.run(numdoc, rut);
+  const revisaSaldo = (rut, numdoc, fecha, saldoActual, claves) => {
+    borrarClaves(claves);
     if (saldoActual > 0) {
       insertConsolidado.run(rut, 'FA', numdoc, fecha, 'D', saldoActual);
     } else {
@@ -2369,25 +2408,35 @@ function analizarCtaCte(db, tabla, revisarCeroEnGrupo) {
   };
 
   rows.forEach((r, i) => {
+    const numdocTrim = (r.Numdoc || '').trim();
+    const rutTrim = (r.Rut || '').trim();
     const delta = r.DebHab === 'D' ? r.Valor : -r.Valor;
+
     if (i === 0) {
       saldo += delta;
-    } else if (r.Numdoc === docant) {
+      clavesGrupo = [{ rut: r.Rut, numdoc: r.Numdoc }];
+    } else if (numdocTrim === docant && rutTrim === rutant) {
       saldo += delta;
-      if (revisarCeroEnGrupo && saldo === 0) anulaReg(docant);
+      clavesGrupo.push({ rut: r.Rut, numdoc: r.Numdoc });
+      if (revisarCeroEnGrupo && saldo === 0) {
+        anulaReg(clavesGrupo);
+        clavesGrupo = [];
+      }
     } else if (saldo === 0) {
-      anulaReg(docant);
+      anulaReg(clavesGrupo);
       saldo = delta;
+      clavesGrupo = [{ rut: r.Rut, numdoc: r.Numdoc }];
     } else {
-      revisaSaldo(rutant, docant, fecant, saldo);
+      revisaSaldo(rutant, docant, fecant, saldo, clavesGrupo);
       saldo = delta;
+      clavesGrupo = [{ rut: r.Rut, numdoc: r.Numdoc }];
     }
-    docant = r.Numdoc;
-    rutant = r.Rut;
+    docant = numdocTrim;
+    rutant = rutTrim;
     fecant = r.Fecha;
   });
 
-  if (saldo === 0) anulaReg(docant);
+  if (saldo === 0) anulaReg(clavesGrupo);
 
   return { anulados, consolidados };
 }

@@ -206,6 +206,11 @@ const handleGrabar = async () => {
     return
   }
 
+  if (form.value.tdoc.trim() && !form.value.rut.trim()) {
+    alert('Esta línea tiene un Tipo de Documento (Tdoc) pero no tiene Rut. Completa el Rut o la Razón Social antes de grabar.')
+    return
+  }
+
   try {
     await run(() => axios.post('http://localhost:3000/api/cdiario/linea', form.value), 'Guardando...')
 
